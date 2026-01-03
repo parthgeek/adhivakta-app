@@ -1,12 +1,12 @@
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
+import {
+  View,
+  Text,
+  StyleSheet,
   TouchableOpacity,
-  ScrollView 
-} from 'react-native';
-import { X, Info, CheckCircle, AlertTriangle } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+  ScrollView,
+} from "react-native";
+import { X, Info, CheckCircle, AlertTriangle } from "lucide-react-native";
+import { useRouter } from "expo-router";
 
 export default function ModalScreen() {
   const router = useRouter();
@@ -14,7 +14,7 @@ export default function ModalScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.closeButton}
           onPress={() => router.back()}
         >
@@ -31,8 +31,9 @@ export default function ModalScreen() {
             <Text style={styles.sectionTitle}>About This Modal</Text>
           </View>
           <Text style={styles.description}>
-            This is a modal screen that can be used to display additional information, 
-            settings, or any content that should appear on top of your current view.
+            This is a modal screen that can be used to display additional
+            information, settings, or any content that should appear on top of
+            your current view.
           </Text>
         </View>
 
@@ -60,7 +61,7 @@ export default function ModalScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => router.back()}
         >
@@ -74,28 +75,28 @@ export default function ModalScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: "#E5E5EA",
   },
   closeButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#f5f5f5",
+    justifyContent: "center",
+    alignItems: "center",
   },
   title: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
   },
   placeholder: {
     width: 40,
@@ -108,67 +109,67 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
     marginBottom: 15,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
   },
   description: {
     fontSize: 16,
     lineHeight: 24,
-    color: '#666',
+    color: "#666",
   },
   features: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     padding: 20,
     borderRadius: 12,
     marginBottom: 30,
   },
   featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     marginBottom: 12,
   },
   featureText: {
     fontSize: 16,
-    color: '#333',
+    color: "#333",
   },
   note: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: 12,
-    backgroundColor: '#FFF3CD',
+    backgroundColor: "#FFF3CD",
     padding: 15,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#FFEAA7',
+    borderColor: "#FFEAA7",
   },
   noteText: {
     flex: 1,
     fontSize: 14,
-    color: '#856404',
+    color: "#856404",
     lineHeight: 20,
   },
   footer: {
     padding: 20,
     borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
+    borderTopColor: "#E5E5EA",
   },
   primaryButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     padding: 16,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   primaryButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
