@@ -1,4 +1,4 @@
-import { Tabs, useRouter, useSegments } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -6,12 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 export default function TabLayout() {
   const router = useRouter();
-  const segments = useSegments();
-  const [user, setUser] = useState<{
-    role: string;
-    name?: string;
-    email?: string;
-  } | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,8 +41,6 @@ export default function TabLayout() {
   if (!user) {
     return null;
   }
-
-  const isLawyer = user?.role === "lawyer";
 
   return (
     <Tabs
@@ -91,22 +84,38 @@ export default function TabLayout() {
       <Tabs.Screen
         name="cases"
         options={{
-          title: isLawyer ? "Cases" : "My Cases",
+          title: "Cases",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="document-text-outline" size={size} color={color} />
           ),
         }}
       />
 
-      {/* Calendar */}
+      {/* Upload - Center Tab (Special Style) */}
       <Tabs.Screen
-        name="calendar"
+        name="upload"
         options={{
-          title: "Calendar",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar-outline" size={size} color={color} />
+          title: "",
+          tabBarIcon: ({ focused }) => (
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: "#000",
+                justifyContent: "center",
+                alignItems: "center",
+                marginBottom: 20,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 8,
+              }}
+            >
+              <Ionicons name="cloud-upload-outline" size={28} color="#fff" />
+            </View>
           ),
-          tabBarBadge: undefined, // Add badge count from API later
         }}
       />
 
@@ -122,66 +131,54 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Profile */}
+      {/* Calendar */}
       <Tabs.Screen
-        name="profile"
+        name="calendar"
         options={{
-          title: "Profile",
+          title: "Calendar",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+            <Ionicons name="calendar-outline" size={size} color={color} />
           ),
+          tabBarBadge: undefined, // Add badge count from API later
         }}
       />
 
       {/* Hidden screens - accessible via navigation but not in tab bar */}
       <Tabs.Screen
+        name="profile"
+        options={{
+          href: null,
+          title: "Profile",
+        }}
+      />
+      <Tabs.Screen
         name="documents"
         options={{
-          href: null, // Hide from tab bar
+          href: null,
           title: "Documents",
         }}
       />
       <Tabs.Screen
         name="notifications"
         options={{
-          href: null, // Hide from tab bar
+          href: null,
           title: "Notifications",
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          href: null, // Hide from tab bar
+          href: null,
           title: "Settings",
         }}
       />
-      {isLawyer && (
-        <Tabs.Screen
-          name="clients"
-          options={{
-            href: null, // Hide from tab bar
-            title: "Clients & Parties",
-          }}
-        />
-      )}
-      {isLawyer && (
-        <Tabs.Screen
-          name="reports"
-          options={{
-            href: null, // Hide from tab bar
-            title: "Reports",
-          }}
-        />
-      )}
-      {!isLawyer && (
-        <Tabs.Screen
-          name="lawyers"
-          options={{
-            href: null, // Hide from tab bar
-            title: "My Lawyers",
-          }}
-        />
-      )}
+      <Tabs.Screen
+        name="explore"
+        options={{
+          href: null,
+          title: "Explore",
+        }}
+      />
     </Tabs>
   );
 }

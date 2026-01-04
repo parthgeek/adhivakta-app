@@ -227,7 +227,6 @@ export default function LandingScreen() {
             </TouchableOpacity>
           </View>
         </View>
-
         {/* Footer */}
         <View style={styles.footer}>
           <Image
