@@ -1,19 +1,19 @@
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  Image,
-} from "react-native";
-import { useState } from "react";
-import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -70,7 +70,7 @@ export default function LoginScreen() {
         <View style={styles.logoContainer}>
           <TouchableOpacity onPress={() => router.push("/")}>
             <Image
-              source={require("../../assets/adhi_logo_main.png")}
+              source={require("../assets/adhi_logo_main.png")}
               style={styles.logo}
               resizeMode="contain"
             />
@@ -188,7 +188,7 @@ export default function LoginScreen() {
         {/* Register Link */}
         <View style={styles.registerContainer}>
           <Text style={styles.registerText}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => router.push("/auth/register")}>
+          <TouchableOpacity onPress={() => router.push("/register")}>
             <Text style={styles.registerLink}>Sign up</Text>
           </TouchableOpacity>
         </View>

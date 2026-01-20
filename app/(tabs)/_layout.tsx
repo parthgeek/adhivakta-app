@@ -1,8 +1,8 @@
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Tabs, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Ionicons } from "@expo/vector-icons";
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from "react-native";
 
 export default function TabLayout() {
   const router = useRouter();
@@ -20,11 +20,11 @@ export default function TabLayout() {
         const userData = JSON.parse(storedUser);
         setUser(userData);
       } else {
-        router.replace("/auth/login");
+        router.replace("/login"); // Fixed path based on earlier conversation summaries
       }
     } catch (error) {
       console.error("Auth check error:", error);
-      router.replace("/auth/login");
+      router.replace("/login");
     } finally {
       setLoading(false);
     }
@@ -44,7 +44,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      screenOptions={{
+      screenOptions={({ route }) => ({
         tabBarActiveTintColor: "#000",
         tabBarInactiveTintColor: "#6b7280",
         tabBarStyle: {
@@ -67,7 +67,17 @@ export default function TabLayout() {
           fontSize: 18,
           color: "#111",
         },
-      }}
+        headerLeft: () => route.name !== 'profile' ? (
+          <TouchableOpacity onPress={() => router.push('/profile')} style={{ marginLeft: 15 }}>
+            <Ionicons name="person-circle-outline" size={24} color="#000" />
+          </TouchableOpacity>
+        ) : null,
+        headerRight: () => route.name !== 'notifications' ? (
+          <TouchableOpacity onPress={() => router.push('/notifications')} style={{ marginRight: 15 }}>
+            <Ionicons name="notifications-outline" size={24} color="#000" />
+          </TouchableOpacity>
+        ) : null
+      })}
     >
       {/* Dashboard */}
       <Tabs.Screen

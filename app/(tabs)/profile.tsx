@@ -1,24 +1,23 @@
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity,
-  Image 
-} from 'react-native';
-import { 
-  User, 
-  Settings, 
-  HelpCircle, 
-  LogOut,
+import { useRouter } from 'expo-router';
+import {
+  Bell,
   ChevronRight,
+  CreditCard,
+  FileText,
+  HelpCircle,
+  LogOut,
+  Settings,
   Shield,
   Star,
-  FileText,
-  CreditCard,
-  Bell
+  User
 } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 
 const menuItems = [
   { icon: User, title: 'Edit Profile', route: '/edit-profile' },
@@ -47,8 +46,8 @@ export default function ProfileScreen() {
             <Text style={styles.role}>Premium Member</Text>
           </View>
         </View>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.editButton}
           onPress={() => router.push('/edit-profile')}
         >
@@ -75,7 +74,7 @@ export default function ProfileScreen() {
 
       <View style={styles.menu}>
         {menuItems.map((item, index) => (
-          <TouchableOpacity 
+          <TouchableOpacity
             key={index}
             style={styles.menuItem}
             onPress={() => router.push(item.route)}
@@ -118,8 +117,10 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E5EA',
   },
   profileInfo: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    marginRight: 10,
   },
   avatar: {
     width: 70,

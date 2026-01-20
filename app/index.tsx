@@ -96,13 +96,13 @@ export default function LandingScreen() {
           <View style={styles.headerButtons}>
             <TouchableOpacity
               style={styles.loginButton}
-              onPress={() => router.push("/auth/login")}
+              onPress={() => router.push("/login")}
             >
               <Text style={styles.loginButtonText}>Login</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.getStartedButton}
-              onPress={() => router.push("/auth/register")}
+              onPress={() => router.push("/register")}
             >
               <Text style={styles.getStartedButtonText}>Get Started</Text>
             </TouchableOpacity>
@@ -131,7 +131,7 @@ export default function LandingScreen() {
               <View style={styles.heroButtons}>
                 <TouchableOpacity
                   style={styles.heroPrimaryButton}
-                  onPress={() => router.push("/auth/register")}
+                  onPress={() => router.push("/register")}
                 >
                   <Text style={styles.heroPrimaryButtonText}>
                     Start Free Trial
@@ -218,7 +218,7 @@ export default function LandingScreen() {
           <View style={styles.ctaButtons}>
             <TouchableOpacity
               style={styles.ctaPrimaryButton}
-              onPress={() => router.push("/auth/register")}
+              onPress={() => router.push("/register")}
             >
               <Text style={styles.ctaPrimaryButtonText}>Start Free Trial</Text>
             </TouchableOpacity>

@@ -1,19 +1,19 @@
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { useState } from "react";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -96,7 +96,7 @@ export default function RegisterScreen() {
           <View style={styles.logoContainer}>
             <TouchableOpacity onPress={() => router.push("/")}>
               <Image
-                source={require("../../assets/adhi_logo_main.png")}
+                source={require("../assets/adhi_logo_main.png")}
                 style={styles.logo}
                 resizeMode="contain"
               />
@@ -242,7 +242,7 @@ export default function RegisterScreen() {
         <View style={styles.logoContainer}>
           <TouchableOpacity onPress={() => router.push("/")}>
             <Image
-              source={require("../../assets/adhi_logo_main.png")}
+              source={require("../assets/adhi_logo_main.png")}
               style={styles.logo}
               resizeMode="contain"
             />
@@ -337,7 +337,7 @@ export default function RegisterScreen() {
         {/* Login Link */}
         <View style={styles.loginContainer}>
           <Text style={styles.loginText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => router.push("/auth/login")}>
+          <TouchableOpacity onPress={() => router.push("/login")}>
             <Text style={styles.loginLink}>Sign in</Text>
           </TouchableOpacity>
         </View>
