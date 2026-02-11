@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "915129812927",
+    "project_id": "adhivakta-f584f",
+    "storage_bucket": "adhivakta-f584f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:915129812927:android:fd95dfe36c76d388be030a",
+        "android_client_info": {
+          "package_name": "com.adhivakta.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "915129812927-27sib23mune0kgn9ljp7259401vg1m3r.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAJkCMohGUR1sWgqhUEKqFvbQ5E9ww0Rfo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "915129812927-27sib23mune0kgn9ljp7259401vg1m3r.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

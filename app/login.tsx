@@ -1,11 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -14,8 +14,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuth } from "../contexts/AuthContext";
+
 export default function LoginScreen() {
   const router = useRouter();
+  const { login, forceLogin } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -23,38 +26,55 @@ export default function LoginScreen() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  // Force login modal state
+  const [showForceLoginModal, setShowForceLoginModal] = useState(false);
+
   const handleSubmit = async () => {
     setError("");
-    setIsLoading(true);
 
-    setTimeout(async () => {
-      if (email && password) {
-        // Save user to storage
-        await AsyncStorage.setItem(
-          "user",
-          JSON.stringify({
-            role: "lawyer",
-            name: "Test User",
-            email: email,
-          })
-        );
+    if (!email || !password) {
+      setError("Please enter email and password");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await login(email.trim(), password);
+
+      if (result.success) {
+        router.replace("/(tabs)");
+      } else if (result.code === "ALREADY_LOGGED_IN") {
+        // Show force login modal
+        setShowForceLoginModal(true);
+      } else {
+        setError(result.error || "Login failed");
+      }
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForceLogin = async () => {
+    setShowForceLoginModal(false);
+    setIsLoading(true);
+    try {
+      const result = await forceLogin(email.trim(), password);
+      if (result.success) {
         router.replace("/(tabs)");
       } else {
-        setError("Please enter email and password");
+        setError(result.error || "Force login failed");
       }
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleGoogleLogin = async () => {
-    setError("");
-    setIsLoading(true);
-
-    // Simulate Google login - replace with actual auth later
-    setTimeout(() => {
-      router.push("/(tabs)");
-      setIsLoading(false);
-    }, 1000);
+    setError("Google Sign-In requires native setup. Please use email login for now.");
   };
 
   return (
@@ -114,7 +134,7 @@ export default function LoginScreen() {
             <View style={styles.labelRow}>
               <Text style={styles.label}>Password</Text>
               <TouchableOpacity
-                onPress={() => router.push("/auth/forgot-password")}
+                onPress={() => router.push("/auth/forgot-password" as any)}
               >
                 <Text style={styles.forgotPassword}>Forgot password?</Text>
               </TouchableOpacity>
@@ -202,6 +222,38 @@ export default function LoginScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Force Login Modal */}
+      <Modal
+        visible={showForceLoginModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowForceLoginModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Ionicons name="warning-outline" size={48} color="#f59e0b" style={{ alignSelf: "center", marginBottom: 16 }} />
+            <Text style={styles.modalTitle}>Already Logged In</Text>
+            <Text style={styles.modalSubtitle}>
+              You are already logged in on another device. Would you like to logout from that device and login here?
+            </Text>
+            <TouchableOpacity
+              style={styles.forceLoginButton}
+              onPress={handleForceLogin}
+            >
+              <Text style={styles.forceLoginButtonText}>
+                Logout Other Device & Login Here
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setShowForceLoginModal(false)}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -393,6 +445,56 @@ const styles = StyleSheet.create({
   },
   termsLink: {
     color: "#000",
+    fontWeight: "500",
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#111",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: "#6b7280",
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  forceLoginButton: {
+    backgroundColor: "#ef4444",
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  forceLoginButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  cancelButton: {
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    color: "#6b7280",
     fontWeight: "500",
   },
 });

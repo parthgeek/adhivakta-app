@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, type RelativePathString } from 'expo-router';
 import {
   Bell,
   ChevronRight,
@@ -12,12 +12,14 @@ import {
   User
 } from 'lucide-react-native';
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View
 } from 'react-native';
+import { useAuth } from '../../contexts/AuthContext';
 
 const menuItems = [
   { icon: User, title: 'Edit Profile', route: '/edit-profile' },
@@ -32,18 +34,46 @@ const menuItems = [
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+            router.replace('/login' as RelativePathString);
+          },
+        },
+      ]
+    );
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.profileInfo}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>JD</Text>
+            <Text style={styles.avatarText}>{user ? getInitials(user.name) : 'U'}</Text>
           </View>
           <View style={styles.profileDetails}>
-            <Text style={styles.name}>John Doe</Text>
-            <Text style={styles.email}>john.doe@example.com</Text>
-            <Text style={styles.role}>Premium Member</Text>
+            <Text style={styles.name}>{user?.name || 'User'}</Text>
+            <Text style={styles.email}>{user?.email || ''}</Text>
+            <Text style={styles.role}>{user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Member'}</Text>
           </View>
         </View>
 
@@ -90,7 +120,7 @@ export default function ProfileScreen() {
         ))}
       </View>
 
-      <TouchableOpacity style={styles.logoutButton}>
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <LogOut color="#FF3B30" size={20} />
         <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>

@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -14,14 +15,17 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const { register, googleLoginWithIdToken } = useAuth();
   const [accountType, setAccountType] = useState("");
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   // Email form fields
   const [name, setName] = useState("");
@@ -39,12 +43,7 @@ export default function RegisterScreen() {
       return;
     }
 
-    setIsLoading(true);
-    // Simulate Google signup - replace with actual auth later
-    setTimeout(() => {
-      router.push("/(tabs)");
-      setIsLoading(false);
-    }, 1000);
+    setError("Google Sign-In requires native setup. Please use email registration for now.");
   };
 
   const handleEmailSignup = () => {
@@ -57,9 +56,15 @@ export default function RegisterScreen() {
 
   const handleEmailSubmit = async () => {
     setError("");
+    setSuccessMessage("");
 
     if (!name || !email || !password || !confirmPassword) {
       setError("Please fill in all fields");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
       return;
     }
 
@@ -69,11 +74,25 @@ export default function RegisterScreen() {
     }
 
     setIsLoading(true);
-    // Simulate email signup - replace with actual auth later
-    setTimeout(() => {
-      router.push("/(tabs)");
+    try {
+      const result = await register(name.trim(), email.trim(), password, accountType);
+
+      if (result.success) {
+        setSuccessMessage(
+          result.message || "Registration successful! Please check your email to verify your account."
+        );
+        // Show success and redirect to login after a delay
+        setTimeout(() => {
+          router.replace("/login");
+        }, 3000);
+      } else {
+        setError(result.error || "Registration failed");
+      }
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const selectRole = (role: string) => {
@@ -111,6 +130,14 @@ export default function RegisterScreen() {
             </Text>
           </View>
 
+          {/* Success Message */}
+          {successMessage ? (
+            <View style={styles.successContainer}>
+              <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+              <Text style={styles.successText}>{successMessage}</Text>
+            </View>
+          ) : null}
+
           {/* Error Message */}
           {error ? (
             <View style={styles.errorContainer}>
@@ -129,7 +156,7 @@ export default function RegisterScreen() {
                 placeholderTextColor="#9ca3af"
                 value={name}
                 onChangeText={setName}
-                editable={!isLoading}
+                editable={!isLoading && !successMessage}
               />
             </View>
 
@@ -144,7 +171,7 @@ export default function RegisterScreen() {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                editable={!isLoading}
+                editable={!isLoading && !successMessage}
               />
             </View>
 
@@ -154,12 +181,12 @@ export default function RegisterScreen() {
               <View style={styles.passwordContainer}>
                 <TextInput
                   style={styles.passwordInput}
-                  placeholder="Create a password"
+                  placeholder="Create a password (min 6 characters)"
                   placeholderTextColor="#9ca3af"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
-                  editable={!isLoading}
+                  editable={!isLoading && !successMessage}
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
@@ -185,7 +212,7 @@ export default function RegisterScreen() {
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirmPassword}
-                  editable={!isLoading}
+                  editable={!isLoading && !successMessage}
                 />
                 <TouchableOpacity
                   onPress={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -204,9 +231,9 @@ export default function RegisterScreen() {
 
             {/* Submit Button */}
             <TouchableOpacity
-              style={[styles.signUpButton, isLoading && styles.buttonDisabled]}
+              style={[styles.signUpButton, (isLoading || !!successMessage) && styles.buttonDisabled]}
               onPress={handleEmailSubmit}
-              disabled={isLoading}
+              disabled={isLoading || !!successMessage}
             >
               {isLoading ? (
                 <ActivityIndicator color="#fff" />
@@ -218,7 +245,11 @@ export default function RegisterScreen() {
             {/* Back Button */}
             <TouchableOpacity
               style={styles.backButton}
-              onPress={() => setShowEmailForm(false)}
+              onPress={() => {
+                setShowEmailForm(false);
+                setError("");
+                setSuccessMessage("");
+              }}
             >
               <Ionicons name="arrow-back" size={20} color="#111" />
               <Text style={styles.backButtonText}>Back to signup options</Text>
@@ -441,6 +472,20 @@ const styles = StyleSheet.create({
     color: "#6b7280",
     textAlign: "center",
     lineHeight: 20,
+  },
+  successContainer: {
+    backgroundColor: "#ecfdf5",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  successText: {
+    color: "#059669",
+    fontSize: 14,
+    flex: 1,
   },
   errorContainer: {
     backgroundColor: "#fef2f2",
