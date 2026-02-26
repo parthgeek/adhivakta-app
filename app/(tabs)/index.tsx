@@ -7,36 +7,81 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+import api from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
 
 // Types
-type CaseItem = {
+type DashboardCase = {
   id: string;
   title?: string;
   caseNumber?: string;
-  number?: string;
   status?: string;
+  urgent?: boolean;
 };
 
-type Event = {
+type DashboardEvent = {
   id: string;
   title: string;
   start: string;
   type?: string;
+  case?: string;
 };
 
 type DashboardData = {
-  cases: CaseItem[];
-  events: Event[];
+  cases: DashboardCase[];
+  events: DashboardEvent[];
   stats: {
     totalCases: number;
     activeCases: number;
     closedCases: number;
     upcomingHearings: number;
   };
+};
+
+type DashboardAlert = {
+  id: string;
+  title: string;
+  subtitle: string;
+  color: string;
+};
+
+type DashboardActivity = {
+  id: string;
+  title: string;
+  subtitle: string;
+  time: string;
+};
+
+type ApiNotification = {
+  _id?: string;
+  type?: string;
+  message?: string;
+  createdAt?: string;
+  read?: boolean;
+};
+
+type ApiRecentCase = {
+  id?: string;
+  _id?: string;
+  title?: string;
+  caseNumber?: string;
+  number?: string;
+  status?: string;
+  urgent?: boolean;
+  isUrgent?: boolean;
+};
+
+type ApiUpcomingEvent = {
+  id?: string;
+  _id?: string;
+  title?: string;
+  start?: string;
+  date?: string;
+  type?: string;
+  case?: string;
 };
 
 // Stats Card Component
@@ -73,11 +118,11 @@ const StatsCard = ({
 };
 
 // Case Item Component
-const CaseItem = ({
+const CaseRow = ({
   caseItem,
   onPress,
 }: {
-  caseItem: CaseItem;
+  caseItem: DashboardCase;
   onPress?: () => void;
 }) => {
   const getStatusColor = (status?: string) => {
@@ -105,7 +150,7 @@ const CaseItem = ({
             {caseItem.title || caseItem.caseNumber}
           </Text>
           <Text style={styles.caseNumber} numberOfLines={1}>
-            {caseItem.caseNumber || caseItem.number}
+            {caseItem.caseNumber}
           </Text>
         </View>
         <View
@@ -121,7 +166,7 @@ const CaseItem = ({
 };
 
 // Hearing Item Component
-const HearingItem = ({ event }: { event: Event }) => {
+const HearingItem = ({ event }: { event: DashboardEvent }) => {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -146,6 +191,7 @@ const HearingItem = ({ event }: { event: Event }) => {
           {event.title}
         </Text>
         <Text style={styles.hearingDate}>
+          {event.case ? `${event.case} • ` : ""}
           {formatDate(event.start)} at {formatTime(event.start)}
         </Text>
       </View>
@@ -180,12 +226,55 @@ const QuickActionButton = ({
   );
 };
 
+const getRelativeTime = (dateString?: string) => {
+  if (!dateString) return "Recently";
+
+  const now = new Date();
+  const date = new Date(dateString);
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  const diffInDays = Math.floor(diffInHours / 24);
+
+  if (diffInSeconds < 60) return "Just now";
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+  if (diffInHours < 24) return `${diffInHours}h ago`;
+  if (diffInDays === 1) return "Yesterday";
+  if (diffInDays < 7) return `${diffInDays}d ago`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
+const getNotificationTitle = (type?: string) => {
+  switch (type) {
+    case "case_invitation":
+      return "Case invitation";
+    case "case_update":
+      return "Case updated";
+    case "event_reminder":
+      return "Event reminder";
+    case "document_upload":
+      return "Document uploaded";
+    default:
+      return "Notification";
+  }
+};
+
+const resolveArrayResponse = <T,>(response: unknown): T[] => {
+  const typedResponse = response as { data?: unknown } | undefined;
+  if (Array.isArray(response)) return response as T[];
+  if (Array.isArray(typedResponse?.data)) return typedResponse.data as T[];
+  return [];
+};
+
 // Main Dashboard Component
 export default function DashboardScreen() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [alerts, setAlerts] = useState<DashboardAlert[]>([]);
+  const [recentActivity, setRecentActivity] = useState<DashboardActivity[]>([]);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     cases: [],
     events: [],
@@ -197,80 +286,125 @@ export default function DashboardScreen() {
     },
   });
 
-  useEffect(() => {
-    loadUser();
-    fetchDashboardData();
-  }, []);
-
-  const loadUser = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
-      const storedUser = await AsyncStorage.getItem("user");
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
+      setErrorMessage("");
+
+      const [summaryResponse, recentCasesResponse, upcomingEventsResponse, notificationsResponse] =
+        await Promise.all([
+          api.dashboard.getSummary(),
+          api.dashboard.getRecentCases(),
+          api.dashboard.getUpcomingEvents(),
+          api.notifications.getAll(),
+        ]);
+
+      if (summaryResponse?.error) {
+        setErrorMessage(summaryResponse.error);
       }
-    } catch (error) {
-      console.error("Error loading user:", error);
-    }
-  };
 
-  const fetchDashboardData = async () => {
-    try {
-      // Simulate API call - replace with actual API later
-      // const casesResponse = await api.cases.getAll();
-      // const eventsResponse = await api.events.getAll();
+      const summary = summaryResponse?.data || {};
 
-      // Mock data for now
-      const mockData = {
-        cases: [
-          {
-            id: "1",
-            title: "Smith vs. Johnson",
-            caseNumber: "OS/123/2024",
-            status: "active",
-          },
-          {
-            id: "2",
-            title: "Property Dispute",
-            caseNumber: "WP/456/2024",
-            status: "active",
-          },
-          {
-            id: "3",
-            title: "Contract Case",
-            caseNumber: "CS/789/2024",
-            status: "closed",
-          },
-        ],
-        events: [
-          {
-            id: "1",
-            title: "Court Hearing",
-            start: new Date().toISOString(),
-            type: "Hearing",
-          },
-          {
-            id: "2",
-            title: "Client Meeting",
-            start: new Date(Date.now() + 86400000).toISOString(),
-            type: "Meeting",
-          },
-        ],
+      const normalizedCases = resolveArrayResponse<ApiRecentCase>(recentCasesResponse).map(
+        (caseItem) => ({
+          id: caseItem.id || caseItem._id || "",
+          title: caseItem.title,
+          caseNumber: caseItem.caseNumber || caseItem.number,
+          status: caseItem.status,
+          urgent: Boolean(caseItem.urgent || caseItem.isUrgent),
+        })
+      );
+
+      const normalizedEvents = resolveArrayResponse<ApiUpcomingEvent>(upcomingEventsResponse).map(
+        (event) => ({
+          id: event.id || event._id || "",
+          title: event.title || "Event",
+          start: event.start || event.date || new Date().toISOString(),
+          type: event.type ? String(event.type) : undefined,
+          case: event.case,
+        })
+      );
+
+      const notifications = resolveArrayResponse<ApiNotification>(notificationsResponse);
+      const now = Date.now();
+
+      const upcomingCriticalAlerts: DashboardAlert[] = normalizedEvents
+        .filter((event) => {
+          const eventTime = new Date(event.start).getTime();
+          if (Number.isNaN(eventTime)) return false;
+          const diff = eventTime - now;
+          return diff >= 0 && diff <= 48 * 60 * 60 * 1000;
+        })
+        .slice(0, 2)
+        .map((event) => ({
+          id: `event-${event.id}`,
+          title: `${event.type || "Hearing"} due soon`,
+          subtitle: `${event.title} on ${new Date(event.start).toLocaleDateString(
+            "en-US",
+            { month: "short", day: "numeric" }
+          )}`,
+          color: "#dc2626",
+        }));
+
+      const urgentCaseAlerts: DashboardAlert[] = normalizedCases
+        .filter((caseItem) => caseItem.urgent)
+        .slice(0, 2)
+        .map((caseItem) => ({
+          id: `case-${caseItem.id}`,
+          title: "Urgent case needs attention",
+          subtitle: `${caseItem.caseNumber || caseItem.title || "Case"} is marked urgent`,
+          color: "#eab308",
+        }));
+
+      const liveAlerts = [...upcomingCriticalAlerts, ...urgentCaseAlerts].slice(
+        0,
+        4
+      );
+      setAlerts(liveAlerts);
+
+      const liveActivity: DashboardActivity[] = notifications
+        .slice(0, 5)
+        .map((notification) => ({
+          id: notification._id || Math.random().toString(36).slice(2),
+          title: getNotificationTitle(notification.type),
+          subtitle: notification.message || "Activity update",
+          time: getRelativeTime(notification.createdAt),
+        }));
+      setRecentActivity(liveActivity);
+
+      setDashboardData({
+        cases: normalizedCases,
+        events: normalizedEvents,
         stats: {
-          totalCases: 15,
-          activeCases: 8,
-          closedCases: 7,
-          upcomingHearings: 5,
+          totalCases: Number(summary.totalCases || 0),
+          activeCases: Number(summary.activeCases || 0),
+          closedCases: Number(summary.closedCases || 0),
+          upcomingHearings: Number(summary.upcomingHearings || 0),
         },
-      };
-
-      setDashboardData(mockData);
+      });
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
+      setErrorMessage("Failed to load dashboard data. Pull to refresh.");
+      setDashboardData({
+        cases: [],
+        events: [],
+        stats: {
+          totalCases: 0,
+          activeCases: 0,
+          closedCases: 0,
+          upcomingHearings: 0,
+        },
+      });
+      setAlerts([]);
+      setRecentActivity([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -298,10 +432,16 @@ export default function DashboardScreen() {
       <View style={styles.welcomeSection}>
         <Text style={styles.welcomeTitle}>Dashboard</Text>
         <Text style={styles.welcomeSubtitle}>
-          Welcome back, {user?.name || "User"}. Here's your legal practice
+          Welcome back, {user?.name || "User"}. Here is your legal practice
           overview.
         </Text>
       </View>
+
+      {!!errorMessage && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        </View>
+      )}
 
       {/* Stats Grid */}
       <View style={styles.statsGrid}>
@@ -348,7 +488,7 @@ export default function DashboardScreen() {
             dashboardData.cases
               .slice(0, 5)
               .map((caseItem) => (
-                <CaseItem
+                <CaseRow
                   key={caseItem.id}
                   caseItem={caseItem}
                   onPress={() => router.push(`/cases/${caseItem.id}`)}
@@ -429,30 +569,24 @@ export default function DashboardScreen() {
           </Text>
         </View>
         <View style={styles.sectionContent}>
-          <View style={styles.alertItem}>
-            <View
-              style={[styles.alertIndicator, { backgroundColor: "#dc2626" }]}
-            />
-            <View style={styles.alertContent}>
-              <Text style={styles.alertTitle}>
-                Document deadline approaching
-              </Text>
-              <Text style={styles.alertSubtitle}>
-                OS/123/2024 - Response due in 2 days
-              </Text>
+          {alerts.length > 0 ? (
+            alerts.map((alert) => (
+              <View key={alert.id} style={styles.alertItem}>
+                <View
+                  style={[styles.alertIndicator, { backgroundColor: alert.color }]}
+                />
+                <View style={styles.alertContent}>
+                  <Text style={styles.alertTitle}>{alert.title}</Text>
+                  <Text style={styles.alertSubtitle}>{alert.subtitle}</Text>
+                </View>
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="shield-checkmark-outline" size={40} color="#d1d5db" />
+              <Text style={styles.emptyStateText}>No priority alerts</Text>
             </View>
-          </View>
-          <View style={styles.alertItem}>
-            <View
-              style={[styles.alertIndicator, { backgroundColor: "#eab308" }]}
-            />
-            <View style={styles.alertContent}>
-              <Text style={styles.alertTitle}>Fee payment pending</Text>
-              <Text style={styles.alertSubtitle}>
-                3 clients have pending payments
-              </Text>
-            </View>
-          </View>
+          )}
         </View>
       </View>
 
@@ -465,33 +599,22 @@ export default function DashboardScreen() {
           </Text>
         </View>
         <View style={styles.sectionContent}>
-          <View style={styles.activityItem}>
-            <View style={styles.activityLeft}>
-              <Text style={styles.activityTitle}>Document uploaded</Text>
-              <Text style={styles.activitySubtitle}>
-                OS/123/2024 - Evidence file
-              </Text>
+          {recentActivity.length > 0 ? (
+            recentActivity.map((activity) => (
+              <View key={activity.id} style={styles.activityItem}>
+                <View style={styles.activityLeft}>
+                  <Text style={styles.activityTitle}>{activity.title}</Text>
+                  <Text style={styles.activitySubtitle}>{activity.subtitle}</Text>
+                </View>
+                <Text style={styles.activityTime}>{activity.time}</Text>
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="time-outline" size={40} color="#d1d5db" />
+              <Text style={styles.emptyStateText}>No recent activity</Text>
             </View>
-            <Text style={styles.activityTime}>2h ago</Text>
-          </View>
-          <View style={styles.activityItem}>
-            <View style={styles.activityLeft}>
-              <Text style={styles.activityTitle}>Hearing scheduled</Text>
-              <Text style={styles.activitySubtitle}>
-                WP/456/2024 - Jan 18, 2024
-              </Text>
-            </View>
-            <Text style={styles.activityTime}>4h ago</Text>
-          </View>
-          <View style={styles.activityItem}>
-            <View style={styles.activityLeft}>
-              <Text style={styles.activityTitle}>Client meeting</Text>
-              <Text style={styles.activitySubtitle}>
-                Kumar Family consultation
-              </Text>
-            </View>
-            <Text style={styles.activityTime}>1d ago</Text>
-          </View>
+          )}
         </View>
       </View>
     </ScrollView>
@@ -525,6 +648,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6b7280",
     lineHeight: 20,
+  },
+  errorContainer: {
+    backgroundColor: "#fee2e2",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: "#991b1b",
+    fontSize: 13,
+    fontWeight: "500",
   },
   statsGrid: {
     flexDirection: "row",

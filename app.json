@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Adhivakta",
-    "slug": "adhivakta",
+    "slug": "Adhivakta-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,8 +11,7 @@
 
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.adhivakta.app",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "bundleIdentifier": "com.auxgens.adhivakta"
     },
 
     "android": {
