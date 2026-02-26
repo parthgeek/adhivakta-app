@@ -8,19 +8,19 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
-import { useState, useEffect, useRef } from "react";
-import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import api from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
 
-// Types
 type Group = {
   _id: string;
   name: string;
   lastMessage?: string;
   updatedAt: string;
-  members?: any[];
+  members?: { user?: string; email?: string; role?: string }[];
   unreadCount?: number;
 };
 
@@ -34,99 +34,140 @@ type Message = {
   createdAt: string;
 };
 
+type ApiGroup = {
+  _id: string;
+  name?: string;
+  updatedAt?: string;
+  members?: { user?: string; email?: string; role?: string }[];
+};
+
+type ApiMessage = {
+  _id: string;
+  text?: string;
+  sender?: { _id?: string; name?: string } | string;
+  createdAt?: string;
+};
+
+const mapMessageFromApi = (message: ApiMessage): Message => {
+  const senderObject =
+    typeof message.sender === "object" && message.sender !== null
+      ? message.sender
+      : undefined;
+
+  return {
+    _id: message._id,
+    text: message.text || "",
+    sender: {
+      _id:
+        senderObject?._id ||
+        (typeof message.sender === "string" ? message.sender : ""),
+      name: senderObject?.name || "Unknown",
+    },
+    createdAt: message.createdAt || new Date().toISOString(),
+  };
+};
+
 export default function MessagesScreen() {
-  const router = useRouter();
+  const { user } = useAuth();
   const flatListRef = useRef<FlatList>(null);
-  const [user, setUser] = useState<any>(null);
+
   const [groups, setGroups] = useState<Group[]>([]);
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [view, setView] = useState<"groups" | "chat">("groups");
+  const [errorMessage, setErrorMessage] = useState("");
 
-  useEffect(() => {
-    loadUser();
-    fetchGroups();
-  }, []);
-
-  const loadUser = async () => {
+  const fetchGroups = useCallback(async () => {
     try {
-      const storedUser = await AsyncStorage.getItem("user");
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
+      setErrorMessage("");
+      const result = await api.chat.getGroups();
+
+      if (result?.error) {
+        setErrorMessage(result.error);
+        setGroups([]);
+        return;
       }
-    } catch (error) {
-      console.error("Error loading user:", error);
-    }
-  };
 
-  const fetchGroups = async () => {
-    try {
-      // Replace with actual API call
-      // const data = await api.chat.getGroups();
+      const apiGroups: ApiGroup[] = Array.isArray(result?.data)
+        ? result.data
+        : [];
 
-      // Mock data
-      const mockGroups: Group[] = [
-        {
-          _id: "1",
-          name: "Smith v. Johnson Team",
-          lastMessage: "Meeting scheduled for tomorrow",
-          updatedAt: new Date().toISOString(),
-          members: [],
-          unreadCount: 2,
-        },
-        {
-          _id: "2",
-          name: "Estate of Williams",
-          lastMessage: "Documents received",
-          updatedAt: new Date(Date.now() - 86400000).toISOString(),
-          members: [],
-          unreadCount: 0,
-        },
-      ];
+      const groupsWithPreview = await Promise.all(
+        apiGroups.map(async (group) => {
+          let lastMessage = "";
+          try {
+            const messagesResult = await api.chat.getMessages(group._id, {
+              page: "0",
+              limit: "1",
+            });
 
-      setGroups(mockGroups);
+            if (!messagesResult?.error && Array.isArray(messagesResult?.data)) {
+              lastMessage = messagesResult.data[0]?.text || "";
+            }
+          } catch {
+            // Keep group visible even if preview fetch fails.
+          }
+
+          return {
+            _id: group._id,
+            name: group.name || "Untitled Group",
+            lastMessage,
+            updatedAt: group.updatedAt || new Date().toISOString(),
+            members: group.members || [],
+            unreadCount: 0,
+          };
+        })
+      );
+
+      setGroups(groupsWithPreview);
     } catch (error) {
       console.error("Error fetching groups:", error);
+      setErrorMessage("Failed to load messages. Please try again.");
+      setGroups([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchGroups();
+  }, [fetchGroups]);
 
   const loadMessages = async (groupId: string) => {
     setMessagesLoading(true);
     try {
-      // Replace with actual API call
-      // const data = await api.chat.getMessages(groupId);
+      const result = await api.chat.getMessages(groupId, {
+        page: "0",
+        limit: "100",
+      });
 
-      // Mock data
-      const mockMessages: Message[] = [
-        {
-          _id: "1",
-          text: "Hello, team!",
-          sender: { _id: "2", name: "John Doe" },
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-        },
-        {
-          _id: "2",
-          text: "Hi John! Ready for the meeting?",
-          sender: { _id: user?.id || "1", name: user?.name || "You" },
-          createdAt: new Date(Date.now() - 1800000).toISOString(),
-        },
-      ];
+      if (result?.error) {
+        setErrorMessage(result.error);
+        return;
+      }
 
-      setMessages(mockMessages);
+      const apiMessages: ApiMessage[] = Array.isArray(result?.data)
+        ? result.data
+        : [];
+      const normalizedMessages = apiMessages.map(mapMessageFromApi);
+
+      setMessages(normalizedMessages);
       setActiveGroup(groupId);
       setView("chat");
 
-      // Clear unread count
       setGroups((prev) =>
-        prev.map((g) => (g._id === groupId ? { ...g, unreadCount: 0 } : g))
+        prev.map((group) =>
+          group._id === groupId ? { ...group, unreadCount: 0 } : group
+        )
       );
     } catch (error) {
       console.error("Error loading messages:", error);
+      setErrorMessage("Failed to load chat messages.");
     } finally {
       setMessagesLoading(false);
     }
@@ -139,27 +180,47 @@ export default function MessagesScreen() {
     setNewMessage("");
 
     try {
-      // Replace with actual API call
-      // await api.chat.sendMessage(activeGroup, { text: messageText });
+      const result = await api.chat.sendMessage(activeGroup, { text: messageText });
 
-      // Mock: Add message locally
-      const newMsg: Message = {
-        _id: Date.now().toString(),
-        text: messageText,
-        sender: { _id: user?.id || "1", name: user?.name || "You" },
-        createdAt: new Date().toISOString(),
-      };
+      if (result?.error) {
+        throw new Error(result.error);
+      }
 
-      setMessages((prev) => [...prev, newMsg]);
+      const createdMessage = result?.data
+        ? mapMessageFromApi(result.data)
+        : {
+            _id: Date.now().toString(),
+            text: messageText,
+            sender: { _id: user?.id || "", name: user?.name || "You" },
+            createdAt: new Date().toISOString(),
+          };
 
-      // Scroll to bottom
+      setMessages((prev) => [...prev, createdMessage]);
+      setGroups((prev) =>
+        prev.map((group) =>
+          group._id === activeGroup
+            ? {
+                ...group,
+                lastMessage: createdMessage.text,
+                updatedAt: createdMessage.createdAt,
+              }
+            : group
+        )
+      );
+
       setTimeout(() => {
-        flatListRef.current?.scrollToEnd();
+        flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (error) {
       console.error("Error sending message:", error);
+      setErrorMessage("Failed to send message. Please try again.");
       setNewMessage(messageText);
     }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchGroups();
   };
 
   const formatTime = (dateString: string) => {
@@ -195,7 +256,6 @@ export default function MessagesScreen() {
     );
   }
 
-  // Groups List View
   if (view === "groups") {
     return (
       <View style={styles.container}>
@@ -204,9 +264,18 @@ export default function MessagesScreen() {
           <Text style={styles.headerSubtitle}>{groups.length} group(s)</Text>
         </View>
 
+        {!!errorMessage && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          </View>
+        )}
+
         <FlatList
           data={groups}
           keyExtractor={(item) => item._id}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.groupItem}
@@ -251,7 +320,9 @@ export default function MessagesScreen() {
               <Ionicons name="chatbubbles-outline" size={64} color="#d1d5db" />
               <Text style={styles.emptyStateTitle}>No chat groups</Text>
               <Text style={styles.emptyStateText}>
-                Create a case to start chatting with your team
+                {errorMessage
+                  ? "Please pull to refresh and try again."
+                  : "Create a case to start chatting with your team"}
               </Text>
             </View>
           }
@@ -260,14 +331,12 @@ export default function MessagesScreen() {
     );
   }
 
-  // Chat View
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={90}
     >
-      {/* Chat Header */}
       <View style={styles.chatHeader}>
         <TouchableOpacity
           onPress={() => {
@@ -280,16 +349,15 @@ export default function MessagesScreen() {
         </TouchableOpacity>
         <View style={styles.chatHeaderInfo}>
           <Text style={styles.chatHeaderTitle}>
-            {groups.find((g) => g._id === activeGroup)?.name}
+            {groups.find((group) => group._id === activeGroup)?.name}
           </Text>
           <Text style={styles.chatHeaderSubtitle}>
-            {(groups.find((g) => g._id === activeGroup)?.members?.length || 0) +
-              " members"}
+            {(groups.find((group) => group._id === activeGroup)?.members?.length ||
+              0) + " members"}
           </Text>
         </View>
       </View>
 
-      {/* Messages List */}
       {messagesLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#000" />
@@ -314,7 +382,7 @@ export default function MessagesScreen() {
                 {!isCurrentUser && (
                   <View style={styles.avatarContainer}>
                     <Text style={styles.avatarText}>
-                      {item.sender.name.charAt(0).toUpperCase()}
+                      {(item.sender.name || "?").charAt(0).toUpperCase()}
                     </Text>
                   </View>
                 )}
@@ -364,7 +432,6 @@ export default function MessagesScreen() {
         />
       )}
 
-      {/* Message Input */}
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.messageInput}
@@ -415,6 +482,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6b7280",
     marginTop: 4,
+  },
+  errorContainer: {
+    backgroundColor: "#fee2e2",
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 10,
+    padding: 12,
+  },
+  errorText: {
+    color: "#991b1b",
+    fontSize: 13,
+    fontWeight: "500",
   },
   groupItem: {
     flexDirection: "row",

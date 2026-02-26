@@ -1,8 +1,20 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { Platform } from "react-native";
+import * as WebBrowser from "expo-web-browser";
+import * as AuthSession from "expo-auth-session";
+import * as Google from "expo-auth-session/providers/google";
+import Constants from "expo-constants";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, signInWithCredential, GoogleAuthProvider } from "firebase/auth";
 import { auth } from "../services/firebase";
 import api from "../services/api";
+
+WebBrowser.maybeCompleteAuthSession();
+
+const GOOGLE_WEB_CLIENT_ID = "915129812927-27sib23mune0kgn9ljp7259401vg1m3r.apps.googleusercontent.com";
+const GOOGLE_IOS_CLIENT_ID = "915129812927-fkoqu6a25ur86dqbdn5o5pim7rd3bl0e.apps.googleusercontent.com";
+const GOOGLE_ANDROID_CLIENT_ID = "915129812927-bej09puc99gj9t4cu8jhk2n796nusnht.apps.googleusercontent.com";
+const GOOGLE_EXPO_CLIENT_ID = "915129812927-27sib23mune0kgn9ljp7259401vg1m3r.apps.googleusercontent.com";
 
 // Types
 interface User {
@@ -35,6 +47,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const useProxy = Platform.OS !== "web" && (Constants.appOwnership === "expo" || Constants.appOwnership === "guest");
+    const googleAuthConfig = useMemo(() => {
+        if (useProxy) {
+            return {
+                clientId: GOOGLE_EXPO_CLIENT_ID || GOOGLE_WEB_CLIENT_ID,
+                redirectUri: AuthSession.makeRedirectUri({ useProxy: true }),
+            };
+        }
+
+        return {
+            webClientId: GOOGLE_WEB_CLIENT_ID,
+            iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
+            androidClientId: GOOGLE_ANDROID_CLIENT_ID || undefined,
+        };
+    }, [useProxy]);
+    const [googleRequest, googleResponse, googlePromptAsync] = Google.useIdTokenAuthRequest(googleAuthConfig);
+    const googleResponseRef = useRef<AuthSession.AuthSessionResult | null>(null);
+    useEffect(() => {
+        googleResponseRef.current = googleResponse;
+    }, [googleResponse]);
 
     // Restore session on app start
     useEffect(() => {
@@ -260,8 +292,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isRegisterFlow = false,
         forceLogin = false
     ): Promise<{ success: boolean; error?: string; code?: string }> => {
-        return { success: false, error: "Google Sign-In requires native setup. Use email login for now." };
-    }, []);
+        if (!googleRequest) {
+            return { success: false, error: "Google Sign-In is not ready yet. Please try again." };
+        }
+
+        try {
+            const result = await googlePromptAsync({ useProxy });
+
+            if (result.type !== "success") {
+                if (result.type === "cancel") {
+                    return { success: false, error: "Google Sign-In was cancelled." };
+                }
+                if (result.type === "dismiss") {
+                    return { success: false, error: "Google Sign-In was dismissed." };
+                }
+                return { success: false, error: "Google Sign-In failed. Please try again." };
+            }
+
+            let googleIdToken =
+                result.authentication?.idToken ||
+                (typeof result.params?.id_token === "string" ? result.params.id_token : undefined) ||
+                googleResponseRef.current?.authentication?.idToken ||
+                (typeof googleResponseRef.current?.params?.id_token === "string"
+                    ? googleResponseRef.current.params.id_token
+                    : undefined);
+
+            if (!googleIdToken && typeof result.params?.code === "string") {
+                // On native, promptAsync may resolve before auto code->token exchange completes.
+                for (let i = 0; i < 12; i += 1) {
+                    await new Promise((resolve) => setTimeout(resolve, 250));
+                    googleIdToken =
+                        googleResponseRef.current?.authentication?.idToken ||
+                        (typeof googleResponseRef.current?.params?.id_token === "string"
+                            ? googleResponseRef.current.params.id_token
+                            : undefined);
+                    if (googleIdToken) {
+                        break;
+                    }
+                }
+            }
+
+            if (!googleIdToken) {
+                return { success: false, error: "Google did not return an ID token. Please try again." };
+            }
+
+            const credential = GoogleAuthProvider.credential(googleIdToken);
+            const firebaseResult = await signInWithCredential(auth, credential);
+            const firebaseIdToken = await firebaseResult.user.getIdToken();
+
+            return await googleLoginWithIdToken(firebaseIdToken, role, isRegisterFlow, forceLogin);
+        } catch (error: any) {
+            console.error("[Auth] Google login error:", error);
+            return { success: false, error: error.message || "Google login failed" };
+        }
+    }, [googleLoginWithIdToken, googlePromptAsync, googleRequest, useProxy]);
 
     const forceLoginFn = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
         return login(email, password, true);

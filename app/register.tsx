@@ -19,7 +19,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { register, googleLoginWithIdToken } = useAuth();
+  const { register, googleLogin } = useAuth();
   const [accountType, setAccountType] = useState("");
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
@@ -43,7 +43,21 @@ export default function RegisterScreen() {
       return;
     }
 
-    setError("Google Sign-In requires native setup. Please use email registration for now.");
+    setIsLoading(true);
+    try {
+      const result = await googleLogin(accountType, true);
+      if (result.success) {
+        router.replace("/(tabs)");
+      } else if (result.code === "ALREADY_LOGGED_IN") {
+        setError("You are already logged in on another device. Please login and choose force login.");
+      } else {
+        setError(result.error || "Google sign-up failed");
+      }
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleEmailSignup = () => {
@@ -115,7 +129,7 @@ export default function RegisterScreen() {
           <View style={styles.logoContainer}>
             <TouchableOpacity onPress={() => router.push("/")}>
               <Image
-                source={require("../assets/adhi_logo_main.png")}
+                source={require("../assets/icon.png")}
                 style={styles.logo}
                 resizeMode="contain"
               />
@@ -273,7 +287,7 @@ export default function RegisterScreen() {
         <View style={styles.logoContainer}>
           <TouchableOpacity onPress={() => router.push("/")}>
             <Image
-              source={require("../assets/adhi_logo_main.png")}
+              source={require("../assets/icon.png")}
               style={styles.logo}
               resizeMode="contain"
             />

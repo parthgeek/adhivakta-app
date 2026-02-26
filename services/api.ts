@@ -243,6 +243,19 @@ const api = {
         delete: (id: string) => request(`/notifications/${id}`, { method: "DELETE" }),
     },
 
+    chat: {
+        getGroups: () => request("/chat/groups"),
+        getMessages: (groupId: string, params?: Record<string, string>) => {
+            const query = params ? `?${new URLSearchParams(params).toString()}` : "";
+            return request(`/chat/groups/${groupId}/messages${query}`);
+        },
+        sendMessage: (groupId: string, data: { text: string; attachments?: { filename: string; url: string }[] }) =>
+            request(`/chat/groups/${groupId}/messages`, {
+                method: "POST",
+                body: JSON.stringify(data),
+            }),
+    },
+
     events: {
         getAll: (params?: Record<string, string>) => {
             const query = params ? `?${new URLSearchParams(params).toString()}` : "";

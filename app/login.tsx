@@ -18,7 +18,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, forceLogin } = useAuth();
+  const { login, forceLogin, googleLogin } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -28,6 +28,7 @@ export default function LoginScreen() {
 
   // Force login modal state
   const [showForceLoginModal, setShowForceLoginModal] = useState(false);
+  const [forceLoginProvider, setForceLoginProvider] = useState<"email" | "google" | null>(null);
 
   const handleSubmit = async () => {
     setError("");
@@ -45,6 +46,7 @@ export default function LoginScreen() {
         router.replace("/(tabs)");
       } else if (result.code === "ALREADY_LOGGED_IN") {
         // Show force login modal
+        setForceLoginProvider("email");
         setShowForceLoginModal(true);
       } else {
         setError(result.error || "Login failed");
@@ -60,21 +62,47 @@ export default function LoginScreen() {
     setShowForceLoginModal(false);
     setIsLoading(true);
     try {
-      const result = await forceLogin(email.trim(), password);
+      if (forceLoginProvider === "google") {
+        const result = await googleLogin(undefined, false, true);
+        if (result.success) {
+          router.replace("/(tabs)");
+        } else {
+          setError(result.error || "Force login failed");
+        }
+      } else {
+        const result = await forceLogin(email.trim(), password);
+        if (result.success) {
+          router.replace("/(tabs)");
+        } else {
+          setError(result.error || "Force login failed");
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred");
+    } finally {
+      setIsLoading(false);
+      setForceLoginProvider(null);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError("");
+    setIsLoading(true);
+    try {
+      const result = await googleLogin();
       if (result.success) {
         router.replace("/(tabs)");
+      } else if (result.code === "ALREADY_LOGGED_IN") {
+        setForceLoginProvider("google");
+        setShowForceLoginModal(true);
       } else {
-        setError(result.error || "Force login failed");
+        setError(result.error || "Google login failed");
       }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleGoogleLogin = async () => {
-    setError("Google Sign-In requires native setup. Please use email login for now.");
   };
 
   return (
@@ -90,7 +118,7 @@ export default function LoginScreen() {
         <View style={styles.logoContainer}>
           <TouchableOpacity onPress={() => router.push("/")}>
             <Image
-              source={require("../assets/adhi_logo_main.png")}
+              source={require("../assets/icon.png")}
               style={styles.logo}
               resizeMode="contain"
             />
@@ -228,7 +256,10 @@ export default function LoginScreen() {
         visible={showForceLoginModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowForceLoginModal(false)}
+        onRequestClose={() => {
+          setShowForceLoginModal(false);
+          setForceLoginProvider(null);
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -247,7 +278,10 @@ export default function LoginScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.cancelButton}
-              onPress={() => setShowForceLoginModal(false)}
+              onPress={() => {
+                setShowForceLoginModal(false);
+                setForceLoginProvider(null);
+              }}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>

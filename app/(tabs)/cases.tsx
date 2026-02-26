@@ -8,10 +8,11 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+import api from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
 
 // Types
 type CaseItem = {
@@ -24,6 +25,53 @@ type CaseItem = {
   status: string;
   nextHearing?: string;
 };
+
+type ApiCase = {
+  _id: string;
+  title?: string;
+  caseNumber?: string;
+  caseType?: string;
+  client?: { name?: string } | string | null;
+  clients?: { name?: string; isPrimary?: boolean }[];
+  court?: string;
+  status?: string;
+  nextHearingDate?: string;
+};
+
+const formatCaseType = (value?: string) => {
+  if (!value) return "Other";
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const formatCaseStatus = (value?: string) => {
+  if (!value) return "Active";
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+};
+
+const getClientName = (caseItem: ApiCase) => {
+  if (typeof caseItem.client === "string") return caseItem.client;
+  if (caseItem.client?.name) return caseItem.client.name;
+
+  if (Array.isArray(caseItem.clients) && caseItem.clients.length > 0) {
+    const primaryClient = caseItem.clients.find((client) => client.isPrimary);
+    return primaryClient?.name || caseItem.clients[0]?.name;
+  }
+
+  return undefined;
+};
+
+const mapCaseFromApi = (caseItem: ApiCase): CaseItem => ({
+  id: caseItem._id,
+  title: caseItem.title || "Untitled Case",
+  number: caseItem.caseNumber || "N/A",
+  type: formatCaseType(caseItem.caseType),
+  client: getClientName(caseItem),
+  court: caseItem.court || "N/A",
+  status: formatCaseStatus(caseItem.status),
+  nextHearing: caseItem.nextHearingDate,
+});
 
 // Case Row Component
 const CaseRow = ({
@@ -108,48 +156,42 @@ const CaseRow = ({
 // Main Cases Screen
 export default function CasesScreen() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [isLawyer, setIsLawyer] = useState(false);
+  const { user } = useAuth();
+  const isLawyer = user?.role === "lawyer";
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [cases, setCases] = useState<CaseItem[]>([]);
+  const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  useEffect(() => {
-    loadUser();
-    fetchCases();
-  }, []);
-
-  const loadUser = async () => {
+  const fetchCases = useCallback(async () => {
     try {
-      const storedUser = await AsyncStorage.getItem("user");
-      if (storedUser) {
-        const userData = JSON.parse(storedUser);
-        setUser(userData);
-        setIsLawyer(userData.role === "lawyer");
+      setErrorMessage("");
+      const response = await api.cases.getAll({ page: "1", limit: "100" });
+
+      if (response?.error) {
+        setErrorMessage(response.error);
+        setCases([]);
+        return;
       }
-    } catch (error) {
-      console.error("Error loading user:", error);
-    }
-  };
 
-  const fetchCases = async () => {
-    try {
-      // Replace with actual API call
-      // const response = await api.cases.getAll();
-
-      // Mock data for now
-      const mockCases = isLawyer ? lawyerCases : clientCases;
-      setCases(mockCases);
+      const apiCases = Array.isArray(response?.data) ? response.data : [];
+      setCases(apiCases.map(mapCaseFromApi));
     } catch (error) {
       console.error("Error fetching cases:", error);
+      setErrorMessage("Failed to load cases. Please try again.");
+      setCases([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchCases();
+  }, [fetchCases]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -278,9 +320,11 @@ export default function CasesScreen() {
             <Ionicons name="folder-open-outline" size={64} color="#d1d5db" />
             <Text style={styles.emptyStateTitle}>No cases found</Text>
             <Text style={styles.emptyStateText}>
-              {searchTerm
-                ? "Try adjusting your search or filters"
-                : "Add your first case to get started"}
+              {errorMessage
+                ? errorMessage
+                : searchTerm
+                  ? "Try adjusting your search or filters"
+                  : "Add your first case to get started"}
             </Text>
             <TouchableOpacity
               style={styles.emptyStateButton}
@@ -294,60 +338,6 @@ export default function CasesScreen() {
     </View>
   );
 }
-
-// Mock Data
-const lawyerCases: CaseItem[] = [
-  {
-    id: "case-1",
-    title: "Smith v. Johnson",
-    number: "CV-2023-1234",
-    type: "Civil Litigation",
-    client: "John Smith",
-    status: "Active",
-    court: "Bangalore Urban District Court",
-    nextHearing: "2023-12-15",
-  },
-  {
-    id: "case-2",
-    title: "Estate of Williams",
-    number: "PR-2023-5678",
-    type: "Probate",
-    client: "Sarah Williams",
-    status: "Active",
-    court: "Karnataka High Court",
-  },
-  {
-    id: "case-3",
-    title: "Brown LLC v. Davis Corp",
-    number: "CV-2023-9012",
-    type: "Corporate",
-    client: "Brown LLC",
-    status: "Active",
-    court: "Commercial Court",
-    nextHearing: "2023-12-20",
-  },
-];
-
-const clientCases: CaseItem[] = [
-  {
-    id: "case-1",
-    title: "Property Dispute",
-    number: "CV-2023-4567",
-    type: "Civil",
-    status: "Active",
-    court: "Bangalore Urban District Court",
-    nextHearing: "2023-06-15",
-  },
-  {
-    id: "case-2",
-    title: "Insurance Claim",
-    number: "CC-2023-7890",
-    type: "Consumer",
-    status: "Active",
-    court: "Consumer Court",
-    nextHearing: "2023-06-22",
-  },
-];
 
 const styles = StyleSheet.create({
   container: {

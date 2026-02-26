@@ -89,7 +89,7 @@ export default function LandingScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Image
-            source={require("../assets/adhi_logo_main.png")}
+            source={require("../assets/icon.png")}
             style={styles.logo}
             resizeMode="contain"
           />
@@ -230,7 +230,7 @@ export default function LandingScreen() {
         {/* Footer */}
         <View style={styles.footer}>
           <Image
-            source={require("../assets/adhi_logo_main.png")}
+            source={require("../assets/icon.png")}
             style={styles.footerLogo}
             resizeMode="contain"
           />
