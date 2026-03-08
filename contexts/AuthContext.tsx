@@ -15,6 +15,7 @@ const GOOGLE_WEB_CLIENT_ID = "915129812927-27sib23mune0kgn9ljp7259401vg1m3r.apps
 const GOOGLE_IOS_CLIENT_ID = "915129812927-fkoqu6a25ur86dqbdn5o5pim7rd3bl0e.apps.googleusercontent.com";
 const GOOGLE_ANDROID_CLIENT_ID = "915129812927-bej09puc99gj9t4cu8jhk2n796nusnht.apps.googleusercontent.com";
 const GOOGLE_EXPO_CLIENT_ID = "915129812927-27sib23mune0kgn9ljp7259401vg1m3r.apps.googleusercontent.com";
+const GOOGLE_IOS_REVERSED_CLIENT_ID = "com.googleusercontent.apps.915129812927-fkoqu6a25ur86dqbdn5o5pim7rd3bl0e";
 
 // Types
 interface User {
@@ -48,6 +49,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [token, setToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const useProxy = Platform.OS !== "web" && (Constants.appOwnership === "expo" || Constants.appOwnership === "guest");
+    const nativeGoogleRedirectUri = useMemo(() => {
+        if (useProxy || Platform.OS !== "ios") {
+            return undefined;
+        }
+
+        // Standalone iOS builds must use the reversed Google client ID scheme.
+        return AuthSession.makeRedirectUri({
+            native: `${GOOGLE_IOS_REVERSED_CLIENT_ID}:/oauthredirect`,
+        });
+    }, [useProxy]);
     const googleAuthConfig = useMemo(() => {
         if (useProxy) {
             return {
@@ -60,8 +71,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             webClientId: GOOGLE_WEB_CLIENT_ID,
             iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
             androidClientId: GOOGLE_ANDROID_CLIENT_ID || undefined,
+            ...(nativeGoogleRedirectUri ? { redirectUri: nativeGoogleRedirectUri } : {}),
         };
-    }, [useProxy]);
+    }, [nativeGoogleRedirectUri, useProxy]);
     const [googleRequest, googleResponse, googlePromptAsync] = Google.useIdTokenAuthRequest(googleAuthConfig);
     const googleResponseRef = useRef<AuthSession.AuthSessionResult | null>(null);
     useEffect(() => {

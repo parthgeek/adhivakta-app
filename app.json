@@ -11,7 +11,7 @@
 
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.auxgens.adhivakta"
+      "bundleIdentifier": "com.adhivakta.app"
     },
 
     "android": {
