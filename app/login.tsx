@@ -30,6 +30,19 @@ export default function LoginScreen() {
   const [showForceLoginModal, setShowForceLoginModal] = useState(false);
   const [forceLoginProvider, setForceLoginProvider] = useState<"email" | "google" | null>(null);
 
+  const redirectToRegister = (provider: "email" | "google") => {
+    router.replace({
+      pathname: "/register",
+      params: {
+        reason: "missing-account",
+        provider,
+        ...(provider === "email" && email.trim()
+          ? { email: email.trim().toLowerCase() }
+          : {}),
+      },
+    } as any);
+  };
+
   const handleSubmit = async () => {
     setError("");
 
@@ -48,6 +61,8 @@ export default function LoginScreen() {
         // Show force login modal
         setForceLoginProvider("email");
         setShowForceLoginModal(true);
+      } else if (result.code === "ACCOUNT_NOT_FOUND") {
+        redirectToRegister("email");
       } else {
         setError(result.error || "Login failed");
       }
@@ -95,6 +110,8 @@ export default function LoginScreen() {
       } else if (result.code === "ALREADY_LOGGED_IN") {
         setForceLoginProvider("google");
         setShowForceLoginModal(true);
+      } else if (result.code === "ACCOUNT_NOT_FOUND") {
+        redirectToRegister("google");
       } else {
         setError(result.error || "Google login failed");
       }
@@ -235,7 +252,7 @@ export default function LoginScreen() {
 
         {/* Register Link */}
         <View style={styles.registerContainer}>
-          <Text style={styles.registerText}>Don't have an account? </Text>
+          <Text style={styles.registerText}>Don&apos;t have an account? </Text>
           <TouchableOpacity onPress={() => router.push("/register")}>
             <Text style={styles.registerLink}>Sign up</Text>
           </TouchableOpacity>

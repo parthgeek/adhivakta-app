@@ -1,9 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -19,6 +18,11 @@ import { useAuth } from "../contexts/AuthContext";
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    email?: string;
+    provider?: string;
+    reason?: string;
+  }>();
   const { register, googleLogin } = useAuth();
   const [accountType, setAccountType] = useState("");
   const [showRoleModal, setShowRoleModal] = useState(false);
@@ -35,8 +39,26 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  useEffect(() => {
+    if (typeof params.email === "string" && params.email) {
+      setEmail(params.email);
+    }
+
+    if (params.reason === "missing-account") {
+      setShowRoleModal(true);
+      setShowEmailForm(false);
+      setSuccessMessage("");
+      setError(
+        params.provider === "google"
+          ? "This Google account is not registered yet. Select your role and sign up first."
+          : "This account is not registered yet. Select your role and create your account first."
+      );
+    }
+  }, [params.email, params.provider, params.reason]);
+
   const handleGoogleSignup = async () => {
     setError("");
+    setSuccessMessage("");
 
     if (!accountType) {
       setError("Please select an account type before continuing with Google.");
@@ -47,9 +69,20 @@ export default function RegisterScreen() {
     try {
       const result = await googleLogin(accountType, true);
       if (result.success) {
-        router.replace("/(tabs)");
-      } else if (result.code === "ALREADY_LOGGED_IN") {
-        setError("You are already logged in on another device. Please login and choose force login.");
+        setSuccessMessage(
+          result.message || "Registration successful. Please sign in to continue."
+        );
+        setTimeout(() => {
+          router.replace("/login");
+        }, 1500);
+      } else if (
+        result.code === "ACCOUNT_EXISTS" ||
+        result.code === "ALREADY_LOGGED_IN"
+      ) {
+        setError("This Google account is already registered. Please sign in instead.");
+        setTimeout(() => {
+          router.replace("/login");
+        }, 1200);
       } else {
         setError(result.error || "Google sign-up failed");
       }
@@ -95,10 +128,14 @@ export default function RegisterScreen() {
         setSuccessMessage(
           result.message || "Registration successful! Please check your email to verify your account."
         );
-        // Show success and redirect to login after a delay
         setTimeout(() => {
           router.replace("/login");
         }, 3000);
+      } else if (result.code === "ACCOUNT_EXISTS") {
+        setError(result.error || "An account with this email already exists. Please sign in instead.");
+        setTimeout(() => {
+          router.replace("/login");
+        }, 1200);
       } else {
         setError(result.error || "Registration failed");
       }
@@ -301,6 +338,14 @@ export default function RegisterScreen() {
             Join thousands of legal professionals using Adhivakta
           </Text>
         </View>
+
+        {/* Success Message */}
+        {successMessage ? (
+          <View style={styles.successContainer}>
+            <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+            <Text style={styles.successText}>{successMessage}</Text>
+          </View>
+        ) : null}
 
         {/* Error Message */}
         {error ? (

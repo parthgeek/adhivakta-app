@@ -233,12 +233,6 @@ export default function CasesScreen() {
               {filteredCases.length === 1 ? "case" : "cases"}
             </Text>
           </View>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => router.push("/cases/new")}
-          >
-            <Ionicons name="add" size={24} color="#fff" />
-          </TouchableOpacity>
         </View>
 
         {/* Search Bar */}
@@ -335,6 +329,15 @@ export default function CasesScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Add Case FAB */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push("/cases/new")}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -374,18 +377,21 @@ const styles = StyleSheet.create({
     color: "#6b7280",
     marginTop: 4,
   },
-  addButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  fab: {
+    position: "absolute",
+    bottom: 24,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
   },
   searchContainer: {
     flexDirection: "row",

@@ -261,6 +261,37 @@ export default function UploadScreen() {
     }
   };
 
+  const scanDocument = async () => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const ImagePicker = require("expo-image-picker");
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("Permission Required", "Camera access is needed to scan documents.");
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setSelectedFile({
+          name: `scan_${Date.now()}.jpg`,
+          uri: asset.uri,
+          mimeType: "image/jpeg",
+          size: asset.fileSize ?? 0,
+        });
+      }
+    } catch (error) {
+      console.error("Error scanning document:", error);
+      Alert.alert(
+        "Scanner Unavailable",
+        "Document scanning requires a development build. Use 'Choose File' to select an image instead."
+      );
+    }
+  };
+
   const handleUpload = async () => {
     if (!selectedFile || !selectedCase) {
       Alert.alert("Missing Information", "Please select a file and case");
@@ -328,33 +359,42 @@ export default function UploadScreen() {
 
       {/* Upload Form */}
       <View style={styles.uploadCard}>
-        {/* File Picker */}
-        <TouchableOpacity
-          style={styles.filePickerButton}
-          onPress={pickDocument}
-          disabled={loading}
-        >
-          <View style={styles.filePickerContent}>
-            <Ionicons name="cloud-upload-outline" size={48} color="#6b7280" />
-            {selectedFile ? (
-              <>
-                <Text style={styles.filePickerTextBold}>
-                  {selectedFile.name}
-                </Text>
-                <Text style={styles.filePickerTextSmall}>
-                  {formatFileSize(selectedFile.size)}
-                </Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.filePickerText}>Tap to select a file</Text>
-                <Text style={styles.filePickerTextSmall}>
-                  PDF, DOC, DOCX, Images, etc.
-                </Text>
-              </>
+        {/* File Picker Buttons */}
+        <View style={styles.pickerRow}>
+          <TouchableOpacity
+            style={styles.pickerButton}
+            onPress={pickDocument}
+            disabled={loading}
+          >
+            <Ionicons name="folder-open-outline" size={28} color="#6b7280" />
+            <Text style={styles.pickerButtonText}>Choose File</Text>
+            <Text style={styles.pickerButtonSubtext}>PDF, DOC, Images…</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.pickerButton}
+            onPress={scanDocument}
+            disabled={loading}
+          >
+            <Ionicons name="scan-outline" size={28} color="#6b7280" />
+            <Text style={styles.pickerButtonText}>Scan Document</Text>
+            <Text style={styles.pickerButtonSubtext}>Use camera</Text>
+          </TouchableOpacity>
+        </View>
+
+        {selectedFile && (
+          <View style={styles.selectedFileInfo}>
+            <Ionicons name="document-attach-outline" size={20} color="#111" />
+            <Text style={styles.filePickerTextBold} numberOfLines={1}>
+              {selectedFile.name}
+            </Text>
+            {selectedFile.size > 0 && (
+              <Text style={styles.filePickerTextSmall}>
+                {formatFileSize(selectedFile.size)}
+              </Text>
             )}
           </View>
-        </TouchableOpacity>
+        )}
 
         {/* Case Selection */}
         <View style={styles.inputGroup}>
@@ -547,33 +587,49 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
-  filePickerButton: {
+  pickerRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 16,
+  },
+  pickerButton: {
+    flex: 1,
     borderWidth: 2,
     borderColor: "#e5e7eb",
     borderStyle: "dashed",
     borderRadius: 12,
-    padding: 32,
-    marginBottom: 20,
+    paddingVertical: 20,
     backgroundColor: "#f9fafb",
-  },
-  filePickerContent: {
     alignItems: "center",
+    gap: 6,
   },
-  filePickerText: {
-    fontSize: 16,
-    color: "#6b7280",
-    marginTop: 12,
-  },
-  filePickerTextBold: {
-    fontSize: 16,
+  pickerButtonText: {
+    fontSize: 14,
     fontWeight: "600",
     color: "#111",
-    marginTop: 12,
+  },
+  pickerButtonSubtext: {
+    fontSize: 12,
+    color: "#9ca3af",
+  },
+  selectedFileInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 16,
+  },
+  filePickerTextBold: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#111",
   },
   filePickerTextSmall: {
     fontSize: 13,
     color: "#9ca3af",
-    marginTop: 4,
   },
   inputGroup: {
     marginBottom: 16,

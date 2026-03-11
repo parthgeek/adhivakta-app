@@ -450,28 +450,28 @@ export default function DashboardScreen() {
           value={dashboardData.stats.activeCases}
           icon="document-text"
           iconColor="#2563eb"
-          onPress={() => router.push("/cases?filter=active")}
+          onPress={() => router.push("/(tabs)/cases")}
         />
         <StatsCard
           title="Total Cases"
           value={dashboardData.stats.totalCases}
           icon="bar-chart"
           iconColor="#16a34a"
-          onPress={() => router.push("/cases")}
+          onPress={() => router.push("/(tabs)/cases")}
         />
         <StatsCard
           title="Closed Cases"
           value={dashboardData.stats.closedCases}
           icon="checkmark-circle"
           iconColor="#9333ea"
-          onPress={() => router.push("/cases?filter=closed")}
+          onPress={() => router.push("/(tabs)/cases")}
         />
         <StatsCard
           title="Upcoming Hearings"
           value={dashboardData.stats.upcomingHearings}
           icon="calendar"
           iconColor="#ea580c"
-          onPress={() => router.push("/calendar")}
+          onPress={() => router.push("/(tabs)/calendar")}
         />
       </View>
 
@@ -680,7 +680,7 @@ const styles = StyleSheet.create({
   statsCardContent: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
   },
   statsTitle: {
     fontSize: 13,

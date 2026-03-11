@@ -1,11 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs, useRouter } from "expo-router";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function TabLayout() {
   const router = useRouter();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -16,8 +18,8 @@ export default function TabLayout() {
           backgroundColor: "#fff",
           borderTopWidth: 1,
           borderTopColor: "#e5e7eb",
-          height: 60,
-          paddingBottom: 8,
+          height: 60 + insets.bottom,
+          paddingBottom: 8 + insets.bottom,
           paddingTop: 8,
         },
         headerStyle: {
@@ -71,7 +73,7 @@ export default function TabLayout() {
         name="upload"
         options={{
           title: "",
-          tabBarIcon: ({ focused }) => (
+          tabBarIcon: () => (
             <View
               style={{
                 width: 56,
@@ -80,7 +82,7 @@ export default function TabLayout() {
                 backgroundColor: "#000",
                 justifyContent: "center",
                 alignItems: "center",
-                marginBottom: 20,
+                marginBottom: 20 + insets.bottom,
                 shadowColor: "#000",
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.3,
