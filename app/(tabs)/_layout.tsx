@@ -108,6 +108,15 @@ export default function TabLayout() {
         }}
       />
 
+      {/* Hearings - accessible via navigation, not in tab bar */}
+      <Tabs.Screen
+        name="hearings"
+        options={{
+          href: null,
+          title: "Hearings",
+        }}
+      />
+
       {/* Calendar */}
       <Tabs.Screen
         name="calendar"
@@ -116,7 +125,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
           ),
-          tabBarBadge: undefined, // Add badge count from API later
         }}
       />
 

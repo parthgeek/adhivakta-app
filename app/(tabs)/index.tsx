@@ -104,15 +104,11 @@ const StatsCard = ({
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View style={styles.statsCardContent}>
-        <View>
-          <Text style={styles.statsTitle}>{title}</Text>
-          <Text style={styles.statsValue}>{value}</Text>
-        </View>
-        <View style={[styles.statsIconContainer]}>
-          <Ionicons name={icon} size={24} color={iconColor} />
-        </View>
+      <View style={styles.statsCardHeader}>
+        <Text style={styles.statsTitle}>{title}</Text>
+        <Ionicons name={icon} size={24} color={iconColor} />
       </View>
+      <Text style={styles.statsValue}>{value}</Text>
     </TouchableOpacity>
   );
 };
@@ -167,23 +163,6 @@ const CaseRow = ({
 
 // Hearing Item Component
 const HearingItem = ({ event }: { event: DashboardEvent }) => {
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   return (
     <View style={styles.hearingItem}>
       <View style={styles.hearingItemLeft}>
@@ -192,7 +171,7 @@ const HearingItem = ({ event }: { event: DashboardEvent }) => {
         </Text>
         <Text style={styles.hearingDate}>
           {event.case ? `${event.case} • ` : ""}
-          {formatDate(event.start)} at {formatTime(event.start)}
+          {formatEventDate(event.start)} at {formatEventTime(event.start)}
         </Text>
       </View>
       <View style={styles.hearingBadge}>
@@ -266,6 +245,28 @@ const resolveArrayResponse = <T,>(response: unknown): T[] => {
   return [];
 };
 
+const getEventTimestamp = (dateString?: string) => {
+  const timestamp = new Date(dateString || "").getTime();
+  return Number.isNaN(timestamp) ? Number.MAX_SAFE_INTEGER : timestamp;
+};
+
+const formatEventDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const formatEventTime = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 // Main Dashboard Component
 export default function DashboardScreen() {
   const router = useRouter();
@@ -322,7 +323,7 @@ export default function DashboardScreen() {
           type: event.type ? String(event.type) : undefined,
           case: event.case,
         })
-      );
+      ).sort((a, b) => getEventTimestamp(a.start) - getEventTimestamp(b.start));
 
       const notifications = resolveArrayResponse<ApiNotification>(notificationsResponse);
       const now = Date.now();
@@ -411,6 +412,8 @@ export default function DashboardScreen() {
     fetchDashboardData();
   };
 
+  const featuredHearing = dashboardData.events[0];
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -467,13 +470,63 @@ export default function DashboardScreen() {
           onPress={() => router.push("/(tabs)/cases")}
         />
         <StatsCard
-          title="Upcoming Hearings"
+          title="Hearings"
           value={dashboardData.stats.upcomingHearings}
           icon="calendar"
           iconColor="#ea580c"
-          onPress={() => router.push("/(tabs)/calendar")}
+          onPress={() => router.push("/(tabs)/hearings")}
         />
       </View>
+
+      <TouchableOpacity
+        style={styles.hearingSpotlight}
+        onPress={() => router.push("/(tabs)/hearings")}
+        activeOpacity={0.85}
+      >
+        <View style={styles.hearingSpotlightHeader}>
+          <View style={styles.hearingSpotlightIcon}>
+            <Ionicons name="calendar-outline" size={20} color="#c2410c" />
+          </View>
+          <View style={styles.hearingSpotlightCopy}>
+            <Text style={styles.hearingSpotlightEyebrow}>Upcoming hearing</Text>
+            <Text style={styles.hearingSpotlightTitle} numberOfLines={1}>
+              {featuredHearing ? featuredHearing.title : "Manage your hearings"}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#9a3412" />
+        </View>
+
+        {featuredHearing ? (
+          <>
+            <Text style={styles.hearingSpotlightDescription} numberOfLines={1}>
+              {featuredHearing.case || "Court schedule"}
+            </Text>
+            <View style={styles.hearingSpotlightMetaRow}>
+              <View style={styles.hearingSpotlightMetaPill}>
+                <Ionicons
+                  name="calendar-clear-outline"
+                  size={14}
+                  color="#9a3412"
+                />
+                <Text style={styles.hearingSpotlightMetaText}>
+                  {formatEventDate(featuredHearing.start)}
+                </Text>
+              </View>
+              <View style={styles.hearingSpotlightMetaPill}>
+                <Ionicons name="time-outline" size={14} color="#9a3412" />
+                <Text style={styles.hearingSpotlightMetaText}>
+                  {formatEventTime(featuredHearing.start)}
+                </Text>
+              </View>
+            </View>
+          </>
+        ) : (
+          <Text style={styles.hearingSpotlightEmpty}>
+            Keep hearings easy to reach from the dashboard while Calendar stays
+            in the footer.
+          </Text>
+        )}
+      </TouchableOpacity>
 
       {/* Recent Cases */}
       <View style={styles.section}>
@@ -507,11 +560,11 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {/* Upcoming Hearings */}
+      {/* Hearings */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Upcoming Hearings</Text>
-          <TouchableOpacity onPress={() => router.push("/calendar")}>
+          <TouchableOpacity onPress={() => router.push("/(tabs)/hearings")}>
             <Text style={styles.viewAllLink}>View all</Text>
           </TouchableOpacity>
         </View>
@@ -677,15 +730,15 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
-  statsCardContent: {
+  statsCardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
+    marginBottom: 8,
   },
   statsTitle: {
     fontSize: 13,
     color: "#6b7280",
-    marginBottom: 8,
     fontWeight: "500",
   },
   statsValue: {
@@ -693,12 +746,74 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#111",
   },
-  statsIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  hearingSpotlight: {
+    backgroundColor: "#fff7ed",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#fdba74",
+  },
+  hearingSpotlightHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  hearingSpotlightIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#ffedd5",
     justifyContent: "center",
     alignItems: "center",
+    marginRight: 12,
+  },
+  hearingSpotlightCopy: {
+    flex: 1,
+    marginRight: 12,
+  },
+  hearingSpotlightEyebrow: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#9a3412",
+    marginBottom: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  hearingSpotlightTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#7c2d12",
+  },
+  hearingSpotlightDescription: {
+    fontSize: 14,
+    color: "#9a3412",
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  hearingSpotlightMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  hearingSpotlightMetaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#ffedd5",
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  hearingSpotlightMetaText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#9a3412",
+  },
+  hearingSpotlightEmpty: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#9a3412",
+    marginTop: 12,
   },
   section: {
     marginBottom: 20,
