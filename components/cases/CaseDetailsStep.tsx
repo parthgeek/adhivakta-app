@@ -27,6 +27,45 @@ type Props = {
     handleCheckboxChange: (name: string, checked: boolean) => void;
 };
 
+const formatDateForInput = (date: Date | null | undefined) => {
+    if (!date) return "";
+
+    const parsedDate = new Date(date);
+    if (Number.isNaN(parsedDate.getTime())) return "";
+
+    const year = parsedDate.getFullYear();
+    const month = `${parsedDate.getMonth() + 1}`.padStart(2, "0");
+    const day = `${parsedDate.getDate()}`.padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+};
+
+const parseDateInput = (value: string) => {
+    const trimmedValue = value.trim();
+
+    if (!trimmedValue) return null;
+
+    const match = trimmedValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return null;
+
+    const [, yearText, monthText, dayText] = match;
+    const year = Number(yearText);
+    const month = Number(monthText);
+    const day = Number(dayText);
+    const parsedDate = new Date(year, month - 1, day);
+
+    if (
+        Number.isNaN(parsedDate.getTime()) ||
+        parsedDate.getFullYear() !== year ||
+        parsedDate.getMonth() !== month - 1 ||
+        parsedDate.getDate() !== day
+    ) {
+        return null;
+    }
+
+    return parsedDate;
+};
+
 // Simple picker modal component
 const PickerField = ({
     label,
@@ -105,6 +144,56 @@ const PickerField = ({
     );
 };
 
+const DateInputField = ({
+    label,
+    required,
+    value,
+    onChange,
+    hint,
+}: {
+    label: string;
+    required?: boolean;
+    value: Date | null | undefined;
+    onChange: (date: Date | null) => void;
+    hint: string;
+}) => {
+    const [draftValue, setDraftValue] = React.useState(formatDateForInput(value));
+
+    React.useEffect(() => {
+        const formattedValue = formatDateForInput(value);
+
+        if (formattedValue) {
+            setDraftValue(formattedValue);
+            return;
+        }
+
+        setDraftValue((currentValue) => (currentValue ? currentValue : ""));
+    }, [value]);
+
+    return (
+        <View style={styles.fieldContainer}>
+            <Text style={styles.label}>
+                {label} {required && <Text style={styles.required}>*</Text>}
+            </Text>
+            <View style={styles.dateInputWrapper}>
+                <Ionicons name="calendar-outline" size={18} color="#6b7280" />
+                <TextInput
+                    style={styles.dateInput}
+                    value={draftValue}
+                    onChangeText={(text) => {
+                        setDraftValue(text);
+                        onChange(parseDateInput(text));
+                    }}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#9ca3af"
+                    autoCapitalize="none"
+                />
+            </View>
+            <Text style={styles.hint}>{hint}</Text>
+        </View>
+    );
+};
+
 export default function CaseDetailsStep({
     caseData,
     handleChange,
@@ -112,16 +201,6 @@ export default function CaseDetailsStep({
     handleDateChange,
     handleCheckboxChange,
 }: Props) {
-    const formatDate = (date: Date | null | undefined) => {
-        if (!date) return "";
-        const d = new Date(date);
-        return d.toLocaleDateString("en-IN", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-        });
-    };
-
     return (
         <View>
             {/* Section Header */}
@@ -182,46 +261,22 @@ export default function CaseDetailsStep({
             />
 
             {/* Filing Date */}
-            <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Filing Date</Text>
-                <TouchableOpacity style={styles.dateButton}>
-                    <Ionicons name="calendar-outline" size={18} color="#6b7280" />
-                    <Text style={styles.dateText}>
-                        {formatDate(caseData.filingDate) || "Select date"}
-                    </Text>
-                </TouchableOpacity>
-                <Text style={styles.hint}>
-                    Default: Today. Tap to change (date picker coming soon).
-                </Text>
-            </View>
+            <DateInputField
+                label="Filing Date"
+                required
+                value={caseData.filingDate}
+                onChange={(date) => handleDateChange("filingDate", date)}
+                hint="Use YYYY-MM-DD. Hearing date must be after this date."
+            />
 
             {/* Next Hearing Date */}
-            <View style={styles.fieldContainer}>
-                <Text style={styles.label}>
-                    First Hearing Date <Text style={styles.required}>*</Text>
-                </Text>
-                <TextInput
-                    style={styles.input}
-                    value={
-                        caseData.nextHearingDate
-                            ? formatDate(caseData.nextHearingDate)
-                            : ""
-                    }
-                    onChangeText={(text) => {
-                        // Accept date as YYYY-MM-DD or DD-MM-YYYY
-                        const parts = text.split(/[-/]/);
-                        if (parts.length === 3) {
-                            const date = new Date(text);
-                            if (!isNaN(date.getTime())) {
-                                handleDateChange("nextHearingDate", date);
-                            }
-                        }
-                    }}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#9ca3af"
-                />
-                <Text style={styles.hint}>Enter date in YYYY-MM-DD format</Text>
-            </View>
+            <DateInputField
+                label="First Hearing Date"
+                required
+                value={caseData.nextHearingDate}
+                onChange={(date) => handleDateChange("nextHearingDate", date)}
+                hint="Use YYYY-MM-DD. This must be after the filing date."
+            />
 
             {/* Priority */}
             <PickerField
@@ -415,7 +470,7 @@ const styles = StyleSheet.create({
         fontWeight: "600",
         color: "#000",
     },
-    dateButton: {
+    dateInputWrapper: {
         flexDirection: "row",
         alignItems: "center",
         gap: 10,
@@ -426,7 +481,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 12,
     },
-    dateText: {
+    dateInput: {
+        flex: 1,
         fontSize: 15,
         color: "#111",
     },

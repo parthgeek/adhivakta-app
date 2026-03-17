@@ -8,9 +8,7 @@ export default function CasesLayout() {
                 options={{
                     title: "New Case",
                     headerShown: true,
-                    headerStyle: {
-                        backgroundColor: "#fff",
-                    },
+                    headerStyle: { backgroundColor: "#fff" },
                     headerTitleStyle: {
                         fontWeight: "600",
                         fontSize: 18,
@@ -20,6 +18,10 @@ export default function CasesLayout() {
                     headerShadowVisible: false,
                     headerBackTitle: "Cases",
                 }}
+            />
+            <Stack.Screen
+                name="[id]"
+                options={{ headerShown: false }}
             />
         </Stack>
     );

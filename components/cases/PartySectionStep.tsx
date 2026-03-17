@@ -4,7 +4,6 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    ScrollView,
     StyleSheet,
     Platform,
 } from "react-native";
@@ -95,7 +94,9 @@ const PartyCard = ({
             </View>
 
             <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Name</Text>
+                <Text style={styles.label}>
+                    Name <Text style={styles.required}>*</Text>
+                </Text>
                 <TextInput
                     style={styles.input}
                     value={party.name}
@@ -407,6 +408,9 @@ const styles = StyleSheet.create({
         fontWeight: "600",
         color: "#374151",
         marginBottom: 6,
+    },
+    required: {
+        color: "#ef4444",
     },
     input: {
         backgroundColor: "#f9fafb",

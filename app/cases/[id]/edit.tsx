@@ -10,18 +10,18 @@ import {
     KeyboardAvoidingView,
     Platform,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 
-import api from "../../services/api";
-import CaseDetailsStep from "../../components/cases/CaseDetailsStep";
-import CourtInfoStep from "../../components/cases/CourtInfoStep";
-import PartySectionStep from "../../components/cases/PartySectionStep";
-import DocumentsStep from "../../components/cases/DocumentsStep";
-import AssociatedPartiesStep from "../../components/cases/AssociatedPartiesStep";
-import { LAWYER_LEVELS } from "../../constants/caseConstants";
+import api from "../../../services/api";
+import CaseDetailsStep from "../../../components/cases/CaseDetailsStep";
+import CourtInfoStep from "../../../components/cases/CourtInfoStep";
+import PartySectionStep from "../../../components/cases/PartySectionStep";
+import DocumentsStep from "../../../components/cases/DocumentsStep";
+import AssociatedPartiesStep from "../../../components/cases/AssociatedPartiesStep";
+import { LAWYER_LEVELS } from "../../../constants/caseConstants";
 
 // ========================
 // Step Configuration
@@ -35,81 +35,141 @@ const STEPS = [
 ] as const;
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
-const LAWYER_LEVEL_VALUES = new Set(
-    LAWYER_LEVELS.map((option) => option.value)
-);
+const LAWYER_LEVEL_VALUES = new Set(LAWYER_LEVELS.map((o) => o.value));
 
-const normalizeText = (value: string | null | undefined) => (value ?? "").trim();
+const normalizeText = (value: string | null | undefined) =>
+    (value ?? "").trim();
 const normalizeEmail = (value: string | null | undefined) =>
     normalizeText(value).toLowerCase();
 
 const getValidDate = (value: Date | string | null | undefined) => {
     if (!value) return null;
-
-    const date = value instanceof Date ? value : new Date(value);
+    const date = value instanceof Date ? value : new Date(value as string);
     return Number.isNaN(date.getTime()) ? null : date;
 };
 
 const getStartOfDay = (value: Date | string | null | undefined) => {
     const date = getValidDate(value);
-
     if (!date) return null;
-
     return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 };
 
 // ========================
-// Initial State
+// Map API response → form state
 // ========================
-const createInitialCaseData = () => ({
-    title: "",
-    caseNumber: "",
-    caseType: "",
-    status: "active",
-    filingDate: new Date(),
-    nextHearingDate: null as Date | null,
-    priority: "normal",
-    caseStage: "filing",
-    isUrgent: false,
-    description: "",
-    actSections: "",
-    reliefSought: "",
-    // Court
-    courtState: "karnataka",
-    district: "bengaluru_urban",
-    courtType: "district_court",
-    bench: "",
-    court: "",
-    courtHall: "",
-    courtComplex: "",
-    notes: "",
-    // Parties
-    petitionerLabel: "Petitioner",
-    respondentLabel: "Defendant",
-    petitioners: [] as any[],
-    respondents: [] as any[],
-    // Associated People
-    lawyers: [] as any[],
-    advocates: [] as any[],
-    clients: [] as any[],
-    stakeholders: [] as any[],
-});
+const mapApiCaseToFormState = (apiCase: any, isLawyer: boolean) => {
+    const petitioners = (apiCase.parties?.petitioner || []).map((p: any) => ({
+        name: p.name || "",
+        type: p.type || "Individual",
+        label: p.role || "Petitioner",
+        email: p.email || "",
+        contact: p.contact || "",
+        address: p.address || "",
+    }));
 
-export default function NewCaseScreen() {
+    const respondents = (apiCase.parties?.respondent || []).map((r: any) => ({
+        name: r.name || "",
+        type: r.type || "Individual",
+        label: r.role || "Respondent",
+        email: r.email || "",
+        contact: r.contact || "",
+        address: r.address || "",
+    }));
+
+    const lawyers = (apiCase.lawyers || []).map((l: any) => ({
+        name: l.name || "",
+        email: l.email || "",
+        contact: l.contact || "",
+        company: l.company || "",
+        gst: l.gst || "",
+        level: l.level || "",
+        chairPosition: l.chairPosition || "supporting",
+        isPrimary: !!l.isPrimary,
+    }));
+
+    const advocates = (apiCase.advocates || []).map((a: any) => ({
+        name: a.name || "",
+        email: a.email || "",
+        contact: a.contact || "",
+        company: a.company || "",
+        gst: a.gst || "",
+        poc: a.poc || "",
+        level: a.level || "",
+        chairPosition: a.chairPosition || "supporting",
+        isLead: !!a.isLead,
+    }));
+
+    const clients = (apiCase.clients || []).map((c: any) => ({
+        name: c.name || "",
+        email: c.email || "",
+        contact: c.contact || "",
+        address: c.address || "",
+    }));
+
+    const stakeholders = (apiCase.stakeholders || []).map((s: any) => ({
+        name: s.name || "",
+        email: s.email || "",
+        contact: s.contact || "",
+        address: s.address || "",
+        roleInCase: s.roleInCase || "",
+    }));
+
+    return {
+        title: apiCase.title || "",
+        caseNumber: apiCase.caseNumber || "",
+        caseType: apiCase.caseType || "",
+        status: apiCase.status || "active",
+        filingDate: getValidDate(apiCase.filingDate) || new Date(),
+        nextHearingDate: getValidDate(apiCase.nextHearingDate),
+        priority: apiCase.priority || "normal",
+        caseStage: apiCase.caseStage || "filing",
+        isUrgent: !!apiCase.isUrgent,
+        description: apiCase.description || "",
+        actSections: apiCase.actSections || "",
+        reliefSought: apiCase.reliefSought || "",
+        // Court
+        courtState: apiCase.courtState || "karnataka",
+        district: apiCase.district || "bengaluru_urban",
+        courtType: apiCase.courtType || "district_court",
+        bench: apiCase.bench || "",
+        court: apiCase.court || "",
+        courtHall: apiCase.courtHall || "",
+        courtComplex: apiCase.courtComplex || "",
+        notes: apiCase.notes || "",
+        // Parties
+        petitionerLabel: "Petitioner",
+        respondentLabel: "Respondent",
+        petitioners,
+        respondents,
+        // People
+        lawyers,
+        advocates,
+        clients,
+        stakeholders,
+    };
+};
+
+export default function EditCaseScreen() {
+    const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
+
     const [currentStep, setCurrentStep] = useState(0);
-    const [caseData, setCaseData] = useState(createInitialCaseData);
+    const [caseData, setCaseData] = useState<any>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [loadingCase, setLoadingCase] = useState(true);
+    const [loadError, setLoadError] = useState("");
     const [user, setUser] = useState<any>(null);
     const [isLawyer, setIsLawyer] = useState(true);
     const [selectedFiles, setSelectedFiles] = useState<any[]>([]);
-    const [uploadProgress, setUploadProgress] = useState<Record<string, number>>(
-        {}
-    );
+    const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
 
     useEffect(() => {
         loadUser();
     }, []);
+
+    useEffect(() => {
+        if (id) fetchCase();
+    }, [id]);
 
     const loadUser = async () => {
         try {
@@ -119,28 +179,49 @@ export default function NewCaseScreen() {
                 setUser(userData);
                 setIsLawyer(userData.role === "lawyer");
             }
-        } catch (error) {
-            console.error("Error loading user:", error);
+        } catch {
+            // ignore
+        }
+    };
+
+    const fetchCase = async () => {
+        try {
+            setLoadError("");
+            const response = await api.cases.get(id as string);
+            if (response?.error) {
+                setLoadError(response.error);
+                return;
+            }
+            const apiCase =
+                response?.data?.case || response?.data || response;
+            const storedUser = await AsyncStorage.getItem("user");
+            const userData = storedUser ? JSON.parse(storedUser) : null;
+            const lawyerRole = userData?.role === "lawyer";
+            setCaseData(mapApiCaseToFormState(apiCase, lawyerRole));
+        } catch (err: any) {
+            setLoadError(err.message || "Failed to load case");
+        } finally {
+            setLoadingCase(false);
         }
     };
 
     // ========================
-    // Handler Functions
+    // Handlers
     // ========================
     const handleChange = (name: string, value: string) => {
-        setCaseData((prev) => ({ ...prev, [name]: value }));
+        setCaseData((prev: any) => ({ ...prev, [name]: value }));
     };
 
     const handleSelectChange = (name: string, value: string) => {
-        setCaseData((prev) => ({ ...prev, [name]: value }));
+        setCaseData((prev: any) => ({ ...prev, [name]: value }));
     };
 
     const handleDateChange = (name: string, date: Date | null) => {
-        setCaseData((prev) => ({ ...prev, [name]: date }));
+        setCaseData((prev: any) => ({ ...prev, [name]: date }));
     };
 
     const handleCheckboxChange = (name: string, checked: boolean) => {
-        setCaseData((prev) => ({ ...prev, [name]: checked }));
+        setCaseData((prev: any) => ({ ...prev, [name]: checked }));
     };
 
     const handleFileChange = async () => {
@@ -150,7 +231,6 @@ export default function NewCaseScreen() {
                 multiple: true,
                 copyToCacheDirectory: true,
             });
-
             if (!result.canceled && result.assets) {
                 const newFiles = result.assets.map((asset) => ({
                     name: asset.name,
@@ -166,18 +246,16 @@ export default function NewCaseScreen() {
     };
 
     // ========================
-    // Validation
+    // Validation (relaxed for edit — hearing date need not be future)
     // ========================
     const validateStep = (stepIndex: number): { valid: boolean; errors: string[] } => {
         const errors: string[] = [];
-        const filingDate = getStartOfDay(caseData.filingDate);
-        const nextHearingDate = getStartOfDay(caseData.nextHearingDate);
+        const filingDate = getStartOfDay(caseData?.filingDate);
         const today = getStartOfDay(new Date());
 
         const validateEmail = (email: string | null | undefined, label: string) => {
-            const normalizedEmail = normalizeEmail(email);
-
-            if (normalizedEmail && !EMAIL_REGEX.test(normalizedEmail)) {
+            const e = normalizeEmail(email);
+            if (e && !EMAIL_REGEX.test(e)) {
                 errors.push(`${label} email is invalid`);
             }
         };
@@ -185,25 +263,18 @@ export default function NewCaseScreen() {
         const validateNamedPeople = (
             items: any[],
             label: string,
-            options?: {
-                requireEmail?: boolean;
-                requireLevel?: boolean;
-            }
+            options?: { requireEmail?: boolean; requireLevel?: boolean }
         ) => {
             items.forEach((item, index) => {
                 const itemLabel = `${label} ${index + 1}`;
-
                 if (!normalizeText(item?.name)) {
                     errors.push(`${itemLabel} name is required`);
                 }
-
                 const email = normalizeEmail(item?.email);
                 if (options?.requireEmail && !email) {
                     errors.push(`${itemLabel} email is required`);
                 }
-
                 validateEmail(email, itemLabel);
-
                 if (
                     options?.requireLevel &&
                     !LAWYER_LEVEL_VALUES.has(normalizeText(item?.level))
@@ -216,65 +287,46 @@ export default function NewCaseScreen() {
         };
 
         switch (stepIndex) {
-            case 0: // Details
-                if (!normalizeText(caseData.title)) errors.push("Case title is required");
-                if (!normalizeText(caseData.caseNumber)) {
-                    errors.push("Case number is required");
-                }
-                if (!caseData.caseType) errors.push("Case type is required");
-                if (!caseData.status) errors.push("Status is required");
-
-                if (!filingDate) {
-                    errors.push("Filing date is required");
-                }
-
+            case 0:
+                if (!normalizeText(caseData?.title)) errors.push("Case title is required");
+                if (!normalizeText(caseData?.caseNumber)) errors.push("Case number is required");
+                if (!caseData?.caseType) errors.push("Case type is required");
+                if (!caseData?.status) errors.push("Status is required");
+                if (!filingDate) errors.push("Filing date is required");
                 if (filingDate && today && filingDate > today) {
                     errors.push("Filing date cannot be in the future");
                 }
-
-                if (!nextHearingDate) {
-                    errors.push("First hearing date is required");
-                }
-
-                if (nextHearingDate && today && nextHearingDate <= today) {
-                    errors.push("First hearing date must be in the future");
-                }
-
-                if (filingDate && nextHearingDate && nextHearingDate <= filingDate) {
-                    errors.push("First hearing date must be after filing date");
+                if (!caseData?.nextHearingDate) {
+                    errors.push("Next hearing date is required");
                 }
                 break;
-            case 1: // Court
-                if (!normalizeText(caseData.court)) {
-                    errors.push("Court name is required");
-                }
+            case 1:
+                if (!normalizeText(caseData?.court)) errors.push("Court name is required");
                 break;
-            case 2: // Parties
-                if ((caseData.petitioners || []).length === 0) {
+            case 2:
+                if ((caseData?.petitioners || []).length === 0) {
                     errors.push("Add at least one petitioner");
                 }
-
-                validateNamedPeople(caseData.petitioners || [], "Petitioner");
-                validateNamedPeople(caseData.respondents || [], "Respondent");
+                validateNamedPeople(caseData?.petitioners || [], "Petitioner");
+                validateNamedPeople(caseData?.respondents || [], "Respondent");
                 break;
-            case 3: // Documents
-                // No strict validation — documents are optional
+            case 3:
+                // Documents optional
                 break;
-            case 4: // Associated Parties
-                validateNamedPeople(caseData.lawyers || [], "Lawyer", {
+            case 4:
+                validateNamedPeople(caseData?.lawyers || [], "Lawyer", {
                     requireEmail: true,
                     requireLevel: true,
                 });
-                validateNamedPeople(caseData.advocates || [], "Advocate", {
+                validateNamedPeople(caseData?.advocates || [], "Advocate", {
                     requireEmail: true,
                     requireLevel: true,
                 });
-                validateNamedPeople(caseData.clients || [], "Client", {
+                validateNamedPeople(caseData?.clients || [], "Client", {
                     requireEmail: true,
                 });
-                validateNamedPeople(caseData.stakeholders || [], "Stakeholder");
-
-                if (isLawyer && (caseData.clients || []).length === 0) {
+                validateNamedPeople(caseData?.stakeholders || [], "Stakeholder");
+                if (isLawyer && (caseData?.clients || []).length === 0) {
                     errors.push("Add at least one client to the case");
                 }
                 break;
@@ -298,24 +350,18 @@ export default function NewCaseScreen() {
     };
 
     const handleBack = () => {
-        if (currentStep > 0) {
-            setCurrentStep((prev) => prev - 1);
-        }
+        if (currentStep > 0) setCurrentStep((prev) => prev - 1);
     };
 
     // ========================
     // Submit
     // ========================
     const handleSubmit = async () => {
-        // Validate all steps
         for (let i = 0; i < STEPS.length; i++) {
             const validation = validateStep(i);
             if (!validation.valid) {
                 setCurrentStep(i);
-                Alert.alert(
-                    `Fix errors in "${STEPS[i].title}"`,
-                    validation.errors.join("\n")
-                );
+                Alert.alert(`Fix errors in "${STEPS[i].title}"`, validation.errors.join("\n"));
                 return;
             }
         }
@@ -373,19 +419,18 @@ export default function NewCaseScreen() {
 
             const derivedLawyersForBackend = isLawyer
                 ? normalizedLawyers
-                : normalizedAdvocates.map((advocate: any) => ({
-                      name: advocate.name,
-                      email: advocate.email,
-                      contact: advocate.contact,
-                      company: advocate.company,
-                      gst: advocate.gst,
-                      poc: advocate.poc,
-                      level: advocate.level,
-                      chairPosition: advocate.chairPosition,
-                      isPrimary: advocate.isLead,
+                : normalizedAdvocates.map((a: any) => ({
+                      name: a.name,
+                      email: a.email,
+                      contact: a.contact,
+                      company: a.company,
+                      gst: a.gst,
+                      poc: a.poc,
+                      level: a.level,
+                      chairPosition: a.chairPosition,
+                      isPrimary: a.isLead,
                   }));
 
-            // Format the payload to match the web app's formattedData
             const formattedData: any = {
                 title: normalizeText(caseData.title),
                 caseNumber: normalizeText(caseData.caseNumber),
@@ -397,7 +442,6 @@ export default function NewCaseScreen() {
                 description: normalizeText(caseData.description),
                 actSections: normalizeText(caseData.actSections),
                 reliefSought: normalizeText(caseData.reliefSought),
-                // Court
                 courtState: caseData.courtState,
                 district: caseData.district,
                 courtType: caseData.courtType || "district_court",
@@ -412,31 +456,22 @@ export default function NewCaseScreen() {
                 },
             };
 
-            // Dates
             if (caseData.filingDate) {
                 formattedData.filingDate = caseData.filingDate;
             }
             if (caseData.nextHearingDate) {
                 formattedData.nextHearingDate = caseData.nextHearingDate;
             }
-
-            // Lawyers (from lawyer view)
             if (derivedLawyersForBackend.length > 0) {
                 formattedData.lawyers = derivedLawyersForBackend;
             }
-
-            // Advocates (from client view)
             if (normalizedAdvocates.length > 0) {
                 formattedData.advocates = normalizedAdvocates;
             }
-
-            // Clients
             if (normalizedClients.length > 0) {
                 formattedData.clients = normalizedClients;
             }
-
-            // Stakeholders
-            if (caseData.stakeholders && caseData.stakeholders.length > 0) {
+            if (caseData.stakeholders?.length > 0) {
                 formattedData.stakeholders = caseData.stakeholders.map((s: any) => ({
                     name: normalizeText(s.name),
                     email: normalizeEmail(s.email),
@@ -446,9 +481,7 @@ export default function NewCaseScreen() {
                 }));
             }
 
-            console.log("Submitting case data:", JSON.stringify(formattedData, null, 2));
-
-            const result = await api.cases.create(formattedData);
+            const result = await api.cases.update(id as string, formattedData);
 
             if (result.error) {
                 Alert.alert("Error", result.error);
@@ -456,10 +489,8 @@ export default function NewCaseScreen() {
                 return;
             }
 
-            // Upload documents if any
-            const createdCaseId = result.data?.case?._id || result.data?._id;
-
-            if (selectedFiles.length > 0 && createdCaseId) {
+            // Upload any newly added documents
+            if (selectedFiles.length > 0) {
                 for (const file of selectedFiles) {
                     const formData = new FormData();
                     formData.append("file", {
@@ -467,10 +498,9 @@ export default function NewCaseScreen() {
                         name: file.name,
                         type: file.mimeType || "application/octet-stream",
                     } as any);
-
                     try {
                         await api.documents.uploadToCaseId(
-                            createdCaseId,
+                            id as string,
                             formData,
                             (event) => {
                                 if (event.lengthComputable) {
@@ -484,30 +514,59 @@ export default function NewCaseScreen() {
                                 }
                             }
                         );
-                        setUploadProgress((prev) => ({ ...prev, [file.name]: 100 }));
+                        setUploadProgress((prev) => ({
+                            ...prev,
+                            [file.name]: 100,
+                        }));
                     } catch (uploadError) {
                         console.error("Upload error for", file.name, uploadError);
                     }
                 }
             }
 
-            Alert.alert("Success", "Case created successfully!", [
+            Alert.alert("Success", "Case updated successfully!", [
                 {
                     text: "OK",
                     onPress: () => router.back(),
                 },
             ]);
         } catch (error: any) {
-            console.error("Submit error:", error);
-            Alert.alert("Error", error.message || "Failed to create case");
+            Alert.alert("Error", error.message || "Failed to update case");
         } finally {
             setIsSubmitting(false);
         }
     };
 
     // ========================
-    // Render Step Content
+    // Render
     // ========================
+    if (loadingCase) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#000" />
+                <Text style={styles.loadingText}>Loading case…</Text>
+            </View>
+        );
+    }
+
+    if (loadError || !caseData) {
+        return (
+            <View style={styles.loadingContainer}>
+                <Ionicons name="alert-circle-outline" size={56} color="#d1d5db" />
+                <Text style={styles.errorText}>{loadError || "Case not found"}</Text>
+                <TouchableOpacity
+                    style={styles.retryButton}
+                    onPress={() => {
+                        setLoadingCase(true);
+                        fetchCase();
+                    }}
+                >
+                    <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
     const renderStepContent = () => {
         switch (currentStep) {
             case 0:
@@ -563,7 +622,7 @@ export default function NewCaseScreen() {
             behavior={Platform.OS === "ios" ? "padding" : undefined}
             keyboardVerticalOffset={100}
         >
-            {/* ========== Progress Bar ========== */}
+            {/* ── Progress Bar ── */}
             <View style={styles.progressSection}>
                 <View style={styles.progressBar}>
                     {STEPS.map((step, index) => (
@@ -575,11 +634,9 @@ export default function NewCaseScreen() {
                                     index < currentStep && styles.progressDotCompleted,
                                 ]}
                                 onPress={() => {
-                                    // Allow jumping to already completed or current steps
                                     if (index <= currentStep) {
                                         setCurrentStep(index);
                                     } else {
-                                        // Validate current step before jumping forward
                                         const validation = validateStep(currentStep);
                                         if (validation.valid) {
                                             setCurrentStep(index);
@@ -629,7 +686,7 @@ export default function NewCaseScreen() {
                 </View>
             </View>
 
-            {/* ========== Content ========== */}
+            {/* ── Step Content ── */}
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -639,7 +696,7 @@ export default function NewCaseScreen() {
                 {renderStepContent()}
             </ScrollView>
 
-            {/* ========== Bottom Navigation ========== */}
+            {/* ── Bottom Navigation ── */}
             <View style={styles.bottomNav}>
                 <TouchableOpacity
                     style={[styles.navButton, styles.cancelButton]}
@@ -673,8 +730,12 @@ export default function NewCaseScreen() {
                                 <ActivityIndicator size="small" color="#fff" />
                             ) : (
                                 <>
-                                    <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-                                    <Text style={styles.submitButtonText}>Save Case</Text>
+                                    <Ionicons
+                                        name="checkmark-circle-outline"
+                                        size={18}
+                                        color="#fff"
+                                    />
+                                    <Text style={styles.submitButtonText}>Update Case</Text>
                                 </>
                             )}
                         </TouchableOpacity>
@@ -693,10 +754,42 @@ export default function NewCaseScreen() {
     );
 }
 
+// ========================
+// Styles
+// ========================
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: "#f5f5f5",
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        gap: 12,
+        backgroundColor: "#f5f5f5",
+    },
+    loadingText: {
+        fontSize: 14,
+        color: "#6b7280",
+    },
+    errorText: {
+        fontSize: 14,
+        color: "#6b7280",
+        textAlign: "center",
+        paddingHorizontal: 24,
+    },
+    retryButton: {
+        backgroundColor: "#000",
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 8,
+        marginTop: 8,
+    },
+    retryButtonText: {
+        color: "#fff",
+        fontSize: 14,
+        fontWeight: "600",
     },
     // Progress
     progressSection: {
@@ -785,9 +878,7 @@ const styles = StyleSheet.create({
                 shadowRadius: 8,
                 paddingBottom: 28,
             },
-            android: {
-                elevation: 8,
-            },
+            android: { elevation: 8 },
         }),
     },
     navButton: {

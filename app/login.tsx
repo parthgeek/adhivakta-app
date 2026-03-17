@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  ImageBackground,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -123,10 +124,16 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    <ImageBackground
+      source={require("../assets/images/bg_main.png")}
+      style={styles.backgroundImage}
+      resizeMode="cover"
     >
+      <View style={styles.overlay} />
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -134,14 +141,19 @@ export default function LoginScreen() {
         {/* Logo */}
         <View style={styles.logoContainer}>
           <TouchableOpacity onPress={() => router.push("/")}>
-            <Image
-              source={require("../assets/icon.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+            <View style={styles.logoGlowOuter}>
+              <View style={styles.logoGlowInner}>
+                <Image
+                  source={require("../assets/icon.png")}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+              </View>
+            </View>
           </TouchableOpacity>
         </View>
 
+        <View style={styles.card}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Welcome back</Text>
@@ -266,10 +278,11 @@ export default function LoginScreen() {
             <Text style={styles.termsLink}>Privacy Policy</Text>
           </Text>
         </View>
+        </View>
       </ScrollView>
 
-      {/* Force Login Modal */}
-      <Modal
+        {/* Force Login Modal */}
+        <Modal
         visible={showForceLoginModal}
         transparent
         animationType="fade"
@@ -304,32 +317,74 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
-    </KeyboardAvoidingView>
+        </Modal>
+      </KeyboardAvoidingView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+  },
   container: {
     flex: 1,
-    backgroundColor: "#f9fafb",
+    backgroundColor: "transparent",
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 40,
+    paddingHorizontal: 20,
+    paddingTop: 40,
+    paddingBottom: 24,
+  },
+  card: {
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
   },
   logoContainer: {
     alignItems: "center",
-    marginBottom: 32,
+    marginBottom: 16,
+    marginTop: 20,
+  },
+  logoGlowOuter: {
+    borderRadius: 22,
+    padding: 3,
+    backgroundColor: "transparent",
+    shadowColor: "#C9A84C",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    elevation: 20,
+    transform: [{ perspective: 800 }, { rotateX: "4deg" }],
+  },
+  logoGlowInner: {
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "rgba(201, 168, 76, 0.9)",
+    overflow: "hidden",
+    backgroundColor: "transparent",
+    shadowColor: "#C9A84C",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
   },
   logo: {
-    width: 120,
-    height: 120,
+    
+    width: 90,
+    height: 90,
   },
   header: {
-    marginBottom: 32,
+    marginBottom: 20,
     alignItems: "center",
   },
   title: {
@@ -355,10 +410,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   form: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 14,
   },
   label: {
     fontSize: 14,
@@ -408,7 +463,7 @@ const styles = StyleSheet.create({
   rememberContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 16,
   },
   checkbox: {
     width: 20,
@@ -441,7 +496,7 @@ const styles = StyleSheet.create({
   divider: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 24,
+    marginVertical: 16,
   },
   dividerLine: {
     flex: 1,
@@ -462,8 +517,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e5e7eb",
     borderRadius: 8,
-    paddingVertical: 14,
-    marginBottom: 24,
+    paddingVertical: 12,
+    marginBottom: 16,
   },
   googleButtonText: {
     marginLeft: 8,
@@ -474,7 +529,7 @@ const styles = StyleSheet.create({
   registerContainer: {
     flexDirection: "row",
     justifyContent: "center",
-    marginBottom: 24,
+    marginBottom: 16,
   },
   registerText: {
     fontSize: 14,

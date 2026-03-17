@@ -12,12 +12,13 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
+    const inIndexRoute = segments.length === 0 || segments[0] === "index";
     const inAuthGroup = segments[0] === "login" || segments[0] === "register";
     const inProtectedGroup = segments[0] === "(tabs)";
 
-    if (!user && inProtectedGroup) {
+    if (!user && (inProtectedGroup || inIndexRoute)) {
       router.replace("/login");
-    } else if (user && inAuthGroup) {
+    } else if (user && (inAuthGroup || inIndexRoute)) {
       router.replace("/(tabs)");
     }
   }, [user, segments, isLoading]);
