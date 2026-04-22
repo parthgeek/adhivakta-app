@@ -222,6 +222,68 @@ const api = {
         getRecent: () => request("/cases/recent"),
     },
 
+    courtDirectory: {
+        getStates: async (source = "ecourts") => {
+            const query = new URLSearchParams({ source }).toString();
+            const response = await request(`/court-directory/states?${query}`);
+            return response?.data || [];
+        },
+
+        getDistricts: async (stateCode: string, source = "ecourts") => {
+            const query = new URLSearchParams({ stateCode, source }).toString();
+            const response = await request(`/court-directory/districts?${query}`);
+            return response?.data || [];
+        },
+
+        getComplexes: async (
+            stateCode: string,
+            districtCode: string,
+            source = "ecourts"
+        ) => {
+            const query = new URLSearchParams({
+                stateCode,
+                districtCode,
+                source,
+            }).toString();
+            const response = await request(`/court-directory/complexes?${query}`);
+            return response?.data || [];
+        },
+
+        getCourts: async (
+            stateCode: string,
+            districtCode: string,
+            complexCode: string,
+            source = "ecourts"
+        ) => {
+            const query = new URLSearchParams({
+                stateCode,
+                districtCode,
+                complexCode,
+                source,
+            }).toString();
+            const response = await request(`/court-directory/courts?${query}`);
+            return response?.data || [];
+        },
+
+        getCaseTypes: async (
+            stateCode: string,
+            districtCode: string,
+            complexCode: string,
+            courtCode: string,
+            source = "ecourts"
+        ) => {
+            const query = new URLSearchParams({
+                stateCode,
+                districtCode,
+                complexCode,
+                courtCode,
+                source,
+            }).toString();
+            const response = await request(`/court-directory/case-types?${query}`);
+            return response?.data || { caseTypes: [] };
+        },
+    },
+
     documents: {
         uploadToCaseId: (
             caseId: string,

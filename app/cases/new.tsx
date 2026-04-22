@@ -58,6 +58,55 @@ const getStartOfDay = (value: Date | string | null | undefined) => {
     return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 };
 
+const normalizeCaseNumber = (value: string | null | undefined) =>
+    normalizeText(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+const DEFAULT_ECOURT_SELECTION = {
+    source: "ecourts",
+    stateCode: "",
+    state: "",
+    districtCode: "",
+    district: "",
+    complexCode: "",
+    complex: "",
+    courtCode: "",
+    court: "",
+    caseTypeCode: "",
+    caseTypeName: "",
+    requiresEstablishment: false,
+};
+
+const EMPTY_COURT_DIRECTORY_OPTIONS = {
+    states: [] as any[],
+    districts: [] as any[],
+    complexes: [] as any[],
+    courts: [] as any[],
+    caseTypes: [] as any[],
+};
+
+const EMPTY_COURT_DIRECTORY_LOADING = {
+    states: false,
+    districts: false,
+    complexes: false,
+    courts: false,
+    caseTypes: false,
+};
+
+const SUPREME_COURT_ECOURT = {
+    source: "supremecourt",
+    stateCode: "IND",
+    state: "India",
+    districtCode: "SCI",
+    district: "Supreme Court of India",
+    complexCode: "SCI_PRINCIPAL_BENCH",
+    complex: "Principal Bench, New Delhi",
+    courtCode: "SCI_MAIN",
+    court: "Supreme Court of India",
+    caseTypeCode: "",
+    caseTypeName: "",
+    requiresEstablishment: false,
+};
+
 // ========================
 // Initial State
 // ========================
@@ -65,6 +114,7 @@ const createInitialCaseData = () => ({
     title: "",
     caseNumber: "",
     caseType: "",
+    caseSubType: "",
     status: "active",
     filingDate: new Date(),
     nextHearingDate: null as Date | null,
@@ -75,14 +125,15 @@ const createInitialCaseData = () => ({
     actSections: "",
     reliefSought: "",
     // Court
-    courtState: "karnataka",
-    district: "bengaluru_urban",
+    courtState: "",
+    district: "",
     courtType: "district_court",
     bench: "",
     court: "",
     courtHall: "",
     courtComplex: "",
     notes: "",
+    eCourt: { ...DEFAULT_ECOURT_SELECTION },
     // Parties
     petitionerLabel: "Petitioner",
     respondentLabel: "Defendant",
@@ -106,6 +157,13 @@ export default function NewCaseScreen() {
     const [uploadProgress, setUploadProgress] = useState<Record<string, number>>(
         {}
     );
+    const [courtSource, setCourtSource] = useState("ecourts");
+    const [courtDirectoryOptions, setCourtDirectoryOptions] = useState(
+        EMPTY_COURT_DIRECTORY_OPTIONS
+    );
+    const [courtDirectoryLoading, setCourtDirectoryLoading] = useState(
+        EMPTY_COURT_DIRECTORY_LOADING
+    );
 
     useEffect(() => {
         loadUser();
@@ -124,6 +182,22 @@ export default function NewCaseScreen() {
         }
     };
 
+    useEffect(() => {
+        const initializeCourtDirectory = async () => {
+            setCourtLookupLoading("states", true);
+            try {
+                const states = await api.courtDirectory.getStates("ecourts");
+                setCourtDirectoryOptions((prev) => ({ ...prev, states }));
+            } catch (error) {
+                console.error("Failed to load states", error);
+            } finally {
+                setCourtLookupLoading("states", false);
+            }
+        };
+
+        initializeCourtDirectory();
+    }, []);
+
     // ========================
     // Handler Functions
     // ========================
@@ -131,7 +205,424 @@ export default function NewCaseScreen() {
         setCaseData((prev) => ({ ...prev, [name]: value }));
     };
 
-    const handleSelectChange = (name: string, value: string) => {
+    const setCourtLookupLoading = (
+        key: keyof typeof EMPTY_COURT_DIRECTORY_LOADING,
+        value: boolean
+    ) => {
+        setCourtDirectoryLoading((prev) => ({ ...prev, [key]: value }));
+    };
+
+    const loadStates = async (source = "ecourts") => {
+        setCourtLookupLoading("states", true);
+
+        try {
+            const states = await api.courtDirectory.getStates(source);
+            setCourtDirectoryOptions((prev) => ({ ...prev, states }));
+        } catch (error) {
+            console.error("Failed to load states", error);
+        } finally {
+            setCourtLookupLoading("states", false);
+        }
+    };
+
+    const loadDistricts = async (stateCode: string, source = "ecourts") => {
+        if (!stateCode) return [];
+
+        setCourtLookupLoading("districts", true);
+
+        try {
+            const districts = await api.courtDirectory.getDistricts(stateCode, source);
+            setCourtDirectoryOptions((prev) => ({
+                ...prev,
+                districts,
+                complexes: [],
+                courts: [],
+                caseTypes: [],
+            }));
+            return districts;
+        } catch (error) {
+            console.error("Failed to load districts", error);
+            setCourtDirectoryOptions((prev) => ({
+                ...prev,
+                districts: [],
+                complexes: [],
+                courts: [],
+                caseTypes: [],
+            }));
+            return [];
+        } finally {
+            setCourtLookupLoading("districts", false);
+        }
+    };
+
+    const loadComplexes = async (
+        stateCode: string,
+        districtCode: string,
+        source = "ecourts"
+    ) => {
+        if (!stateCode || !districtCode) return [];
+
+        setCourtLookupLoading("complexes", true);
+
+        try {
+            const complexes = await api.courtDirectory.getComplexes(
+                stateCode,
+                districtCode,
+                source
+            );
+            setCourtDirectoryOptions((prev) => ({
+                ...prev,
+                complexes,
+                courts: [],
+                caseTypes: [],
+            }));
+            return complexes;
+        } catch (error) {
+            console.error("Failed to load complexes", error);
+            setCourtDirectoryOptions((prev) => ({
+                ...prev,
+                complexes: [],
+                courts: [],
+                caseTypes: [],
+            }));
+            return [];
+        } finally {
+            setCourtLookupLoading("complexes", false);
+        }
+    };
+
+    const loadCourts = async (
+        stateCode: string,
+        districtCode: string,
+        complexCode: string,
+        source = "ecourts"
+    ) => {
+        if (!stateCode || !districtCode || !complexCode) return [];
+
+        setCourtLookupLoading("courts", true);
+
+        try {
+            const courts = await api.courtDirectory.getCourts(
+                stateCode,
+                districtCode,
+                complexCode,
+                source
+            );
+            setCourtDirectoryOptions((prev) => ({
+                ...prev,
+                courts,
+                caseTypes: [],
+            }));
+            return courts;
+        } catch (error) {
+            console.error("Failed to load courts", error);
+            setCourtDirectoryOptions((prev) => ({
+                ...prev,
+                courts: [],
+                caseTypes: [],
+            }));
+            return [];
+        } finally {
+            setCourtLookupLoading("courts", false);
+        }
+    };
+
+    const loadCaseTypes = async (
+        stateCode: string,
+        districtCode: string,
+        complexCode: string,
+        courtCode: string,
+        source = "ecourts"
+    ) => {
+        if (!stateCode || !districtCode || !complexCode || !courtCode) {
+            return [];
+        }
+
+        setCourtLookupLoading("caseTypes", true);
+
+        try {
+            const payload = await api.courtDirectory.getCaseTypes(
+                stateCode,
+                districtCode,
+                complexCode,
+                courtCode,
+                source
+            );
+            const caseTypes = payload?.caseTypes || [];
+            setCourtDirectoryOptions((prev) => ({ ...prev, caseTypes }));
+            return caseTypes;
+        } catch (error) {
+            console.error("Failed to load case types", error);
+            setCourtDirectoryOptions((prev) => ({ ...prev, caseTypes: [] }));
+            return [];
+        } finally {
+            setCourtLookupLoading("caseTypes", false);
+        }
+    };
+
+    const handleCourtTypeChange = async (newSource: string) => {
+        const courtTypeMap: Record<string, string> = {
+            ecourts: "district_court",
+            highcourts: "high_court",
+            supremecourt: "supreme_court",
+        };
+
+        setCourtSource(newSource);
+        setCourtDirectoryOptions(EMPTY_COURT_DIRECTORY_OPTIONS);
+
+        if (newSource === "supremecourt") {
+            setCaseData((prev) => ({
+                ...prev,
+                courtType: "supreme_court",
+                courtState: SUPREME_COURT_ECOURT.state,
+                district: SUPREME_COURT_ECOURT.district,
+                bench: "",
+                court: SUPREME_COURT_ECOURT.court,
+                courtComplex: SUPREME_COURT_ECOURT.complex,
+                caseSubType: "",
+                eCourt: { ...SUPREME_COURT_ECOURT },
+            }));
+
+            await loadCaseTypes(
+                SUPREME_COURT_ECOURT.stateCode,
+                SUPREME_COURT_ECOURT.districtCode,
+                SUPREME_COURT_ECOURT.complexCode,
+                SUPREME_COURT_ECOURT.courtCode,
+                "supremecourt"
+            );
+            return;
+        }
+
+        setCaseData((prev) => ({
+            ...prev,
+            courtType: courtTypeMap[newSource] || "district_court",
+            courtState: "",
+            district: "",
+            bench: "",
+            court: "",
+            courtComplex: "",
+            caseSubType: "",
+            eCourt: {
+                ...DEFAULT_ECOURT_SELECTION,
+                source: newSource,
+            },
+        }));
+
+        await loadStates(newSource);
+    };
+
+    const handleSelectChange = async (name: string, value: string) => {
+        if (name === "ecourtState") {
+            const selectedState = courtDirectoryOptions.states.find(
+                (state: any) => state.code === value
+            );
+
+            setCaseData((prev) => ({
+                ...prev,
+                courtState: selectedState?.name || "",
+                district: "",
+                bench: "",
+                court: "",
+                courtComplex: "",
+                caseSubType: "",
+                eCourt: {
+                    ...DEFAULT_ECOURT_SELECTION,
+                    source: courtSource,
+                    stateCode: value,
+                    state: selectedState?.name || "",
+                },
+            }));
+
+            setCourtDirectoryOptions((prev) => ({
+                ...prev,
+                districts: [],
+                complexes: [],
+                courts: [],
+                caseTypes: [],
+            }));
+
+            await loadDistricts(value, courtSource);
+            return;
+        }
+
+        if (name === "ecourtDistrict") {
+            const selectedDistrict = courtDirectoryOptions.districts.find(
+                (district: any) => district.code === value
+            );
+            const stateCode = caseData.eCourt?.stateCode || "";
+
+            setCaseData((prev) => ({
+                ...prev,
+                district: selectedDistrict?.name || "",
+                bench: courtSource === "highcourts" ? selectedDistrict?.name || "" : "",
+                court: "",
+                courtComplex: "",
+                caseSubType: "",
+                eCourt: {
+                    ...prev.eCourt,
+                    districtCode: value,
+                    district: selectedDistrict?.name || "",
+                    complexCode: "",
+                    complex: "",
+                    courtCode: "",
+                    court: "",
+                    caseTypeCode: "",
+                    caseTypeName: "",
+                    requiresEstablishment: false,
+                },
+            }));
+
+            setCourtDirectoryOptions((prev) => ({
+                ...prev,
+                complexes: [],
+                courts: [],
+                caseTypes: [],
+            }));
+
+            await loadComplexes(stateCode, value, courtSource);
+            return;
+        }
+
+        if (name === "ecourtComplex") {
+            const selectedComplex = courtDirectoryOptions.complexes.find(
+                (complex: any) => complex.code === value
+            );
+            const stateCode = caseData.eCourt?.stateCode || "";
+            const districtCode = caseData.eCourt?.districtCode || "";
+
+            setCaseData((prev) => ({
+                ...prev,
+                courtComplex: selectedComplex?.name || "",
+                bench: courtSource === "highcourts" ? selectedComplex?.name || "" : prev.bench,
+                court: "",
+                caseSubType: "",
+                eCourt: {
+                    ...prev.eCourt,
+                    complexCode: value,
+                    complex: selectedComplex?.name || "",
+                    courtCode: "",
+                    court: "",
+                    caseTypeCode: "",
+                    caseTypeName: "",
+                    requiresEstablishment: false,
+                },
+            }));
+
+            setCourtDirectoryOptions((prev) => ({
+                ...prev,
+                courts: [],
+                caseTypes: [],
+            }));
+
+            const courts = await loadCourts(stateCode, districtCode, value, courtSource);
+
+            if (courts.length === 1) {
+                const selectedCourt = courts[0];
+
+                setCaseData((prev) => ({
+                    ...prev,
+                    court: selectedCourt.name,
+                    eCourt: {
+                        ...prev.eCourt,
+                        courtCode: selectedCourt.code,
+                        court: selectedCourt.name,
+                        caseTypeCode: "",
+                        caseTypeName: "",
+                    },
+                }));
+
+                const caseTypes = await loadCaseTypes(
+                    stateCode,
+                    districtCode,
+                    value,
+                    selectedCourt.code,
+                    courtSource
+                );
+
+                if (caseTypes.length === 1) {
+                    setCaseData((prev) => ({
+                        ...prev,
+                        caseSubType: caseTypes[0].name,
+                        eCourt: {
+                            ...prev.eCourt,
+                            courtCode: selectedCourt.code,
+                            court: selectedCourt.name,
+                            caseTypeCode: caseTypes[0].code,
+                            caseTypeName: caseTypes[0].name,
+                        },
+                    }));
+                }
+            }
+            return;
+        }
+
+        if (name === "ecourtCourt") {
+            const selectedCourt = courtDirectoryOptions.courts.find(
+                (court: any) => court.code === value
+            );
+            const stateCode = caseData.eCourt?.stateCode || "";
+            const districtCode = caseData.eCourt?.districtCode || "";
+            const complexCode = caseData.eCourt?.complexCode || "";
+
+            setCaseData((prev) => ({
+                ...prev,
+                court: selectedCourt?.name || "",
+                caseSubType: "",
+                eCourt: {
+                    ...prev.eCourt,
+                    courtCode: value,
+                    court: selectedCourt?.name || "",
+                    caseTypeCode: "",
+                    caseTypeName: "",
+                },
+            }));
+
+            setCourtDirectoryOptions((prev) => ({
+                ...prev,
+                caseTypes: [],
+            }));
+
+            const caseTypes = await loadCaseTypes(
+                stateCode,
+                districtCode,
+                complexCode,
+                value,
+                courtSource
+            );
+
+            if (caseTypes.length === 1) {
+                setCaseData((prev) => ({
+                    ...prev,
+                    caseSubType: caseTypes[0].name,
+                    eCourt: {
+                        ...prev.eCourt,
+                        courtCode: value,
+                        court: selectedCourt?.name || prev.eCourt?.court || "",
+                        caseTypeCode: caseTypes[0].code,
+                        caseTypeName: caseTypes[0].name,
+                    },
+                }));
+            }
+            return;
+        }
+
+        if (name === "ecourtCaseType") {
+            const selectedCaseType = courtDirectoryOptions.caseTypes.find(
+                (caseType: any) => caseType.code === value
+            );
+
+            setCaseData((prev) => ({
+                ...prev,
+                caseSubType: selectedCaseType?.name || "",
+                eCourt: {
+                    ...prev.eCourt,
+                    caseTypeCode: value,
+                    caseTypeName: selectedCaseType?.name || "",
+                },
+            }));
+            return;
+        }
+
         setCaseData((prev) => ({ ...prev, [name]: value }));
     };
 
@@ -245,8 +736,34 @@ export default function NewCaseScreen() {
                 }
                 break;
             case 1: // Court
-                if (!normalizeText(caseData.court)) {
-                    errors.push("Court name is required");
+                if (courtSource === "supremecourt") {
+                    if (!normalizeText(caseData.eCourt?.caseTypeCode)) {
+                        errors.push("Case type is required");
+                    }
+                } else {
+                    if (!normalizeText(caseData.eCourt?.stateCode)) {
+                        errors.push("State is required");
+                    }
+                    if (!normalizeText(caseData.eCourt?.districtCode)) {
+                        errors.push(
+                            courtSource === "highcourts"
+                                ? "High Court is required"
+                                : "District is required"
+                        );
+                    }
+                    if (!normalizeText(caseData.eCourt?.complexCode)) {
+                        errors.push(
+                            courtSource === "highcourts"
+                                ? "Bench is required"
+                                : "Court complex is required"
+                        );
+                    }
+                    if (!normalizeText(caseData.eCourt?.courtCode)) {
+                        errors.push("Court selection is required");
+                    }
+                    if (!normalizeText(caseData.eCourt?.caseTypeCode)) {
+                        errors.push("Case type is required");
+                    }
                 }
                 break;
             case 2: // Parties
@@ -388,8 +905,11 @@ export default function NewCaseScreen() {
             // Format the payload to match the web app's formattedData
             const formattedData: any = {
                 title: normalizeText(caseData.title),
-                caseNumber: normalizeText(caseData.caseNumber),
+                caseNumber: normalizeCaseNumber(caseData.caseNumber),
                 caseType: caseData.caseType,
+                caseSubType: normalizeText(
+                    caseData.eCourt?.caseTypeName || caseData.caseSubType
+                ),
                 status: caseData.status,
                 priority: caseData.priority,
                 caseStage: caseData.caseStage,
@@ -398,19 +918,36 @@ export default function NewCaseScreen() {
                 actSections: normalizeText(caseData.actSections),
                 reliefSought: normalizeText(caseData.reliefSought),
                 // Court
-                courtState: caseData.courtState,
-                district: caseData.district,
+                courtState: normalizeText(
+                    caseData.eCourt?.state || caseData.courtState
+                ),
+                district: normalizeText(
+                    caseData.eCourt?.district || caseData.district
+                ),
                 courtType: caseData.courtType || "district_court",
                 bench: caseData.bench,
-                court: normalizeText(caseData.court),
+                court: normalizeText(caseData.eCourt?.court || caseData.court),
                 courtHall: normalizeText(caseData.courtHall),
-                courtComplex: normalizeText(caseData.courtComplex),
+                courtComplex: normalizeText(
+                    caseData.eCourt?.complex || caseData.courtComplex
+                ),
                 notes: normalizeText(caseData.notes),
                 parties: {
                     petitioner: normalizedPetitioners,
                     respondent: normalizedRespondents,
                 },
             };
+
+            if (normalizeText(caseData.eCourt?.stateCode)) {
+                formattedData.eCourt = {
+                    ...caseData.eCourt,
+                    state: normalizeText(caseData.eCourt.state),
+                    district: normalizeText(caseData.eCourt.district),
+                    complex: normalizeText(caseData.eCourt.complex),
+                    court: normalizeText(caseData.eCourt.court),
+                    caseTypeName: normalizeText(caseData.eCourt.caseTypeName),
+                };
+            }
 
             // Dates
             if (caseData.filingDate) {
@@ -526,6 +1063,10 @@ export default function NewCaseScreen() {
                         caseData={caseData}
                         handleChange={handleChange}
                         handleSelectChange={handleSelectChange}
+                        courtDirectoryOptions={courtDirectoryOptions}
+                        courtDirectoryLoading={courtDirectoryLoading}
+                        courtSource={courtSource}
+                        handleCourtTypeChange={handleCourtTypeChange}
                     />
                 );
             case 2:

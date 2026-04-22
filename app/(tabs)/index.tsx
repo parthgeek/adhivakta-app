@@ -41,6 +41,13 @@ type DashboardData = {
   };
 };
 
+type ProfileData = {
+  name?: string;
+  role?: string;
+  specialization?: string;
+  phone?: string;
+};
+
 type DashboardAlert = {
   id: string;
   title: string;
@@ -274,6 +281,7 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [alerts, setAlerts] = useState<DashboardAlert[]>([]);
   const [recentActivity, setRecentActivity] = useState<DashboardActivity[]>([]);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
@@ -291,12 +299,13 @@ export default function DashboardScreen() {
     try {
       setErrorMessage("");
 
-      const [summaryResponse, recentCasesResponse, upcomingEventsResponse, notificationsResponse] =
+      const [summaryResponse, recentCasesResponse, upcomingEventsResponse, notificationsResponse, profileResponse] =
         await Promise.all([
           api.dashboard.getSummary(),
           api.dashboard.getRecentCases(),
           api.dashboard.getUpcomingEvents(),
           api.notifications.getAll(),
+          api.profile.get(),
         ]);
 
       if (summaryResponse?.error) {
@@ -304,6 +313,7 @@ export default function DashboardScreen() {
       }
 
       const summary = summaryResponse?.data || {};
+      setProfileData(profileResponse?.data || null);
 
       const normalizedCases = resolveArrayResponse<ApiRecentCase>(recentCasesResponse).map(
         (caseItem) => ({
@@ -397,6 +407,7 @@ export default function DashboardScreen() {
       });
       setAlerts([]);
       setRecentActivity([]);
+      setProfileData(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -413,6 +424,43 @@ export default function DashboardScreen() {
   };
 
   const featuredHearing = dashboardData.events[0];
+  const displayName = profileData?.name || user?.name || "User";
+  const displayRole = profileData?.role || user?.role || "member";
+  const roleLabel =
+    displayRole.charAt(0).toUpperCase() + displayRole.slice(1);
+  const quickActions = [
+    {
+      icon: "add-circle-outline" as const,
+      label: "New Case",
+      color: "#2563eb",
+      onPress: () => router.push("/cases/new"),
+    },
+    {
+      icon: "cloud-upload-outline" as const,
+      label: "Upload",
+      color: "#16a34a",
+      onPress: () => router.push("/upload"),
+    },
+    {
+      icon: "calendar-outline" as const,
+      label: "Hearings",
+      color: "#9333ea",
+      onPress: () => router.push("/hearings"),
+    },
+    {
+      icon: displayRole === "lawyer" || displayRole === "admin"
+        ? "chatbubble-ellipses-outline"
+        : "notifications-outline",
+      label: displayRole === "lawyer" || displayRole === "admin" ? "Messages" : "Alerts",
+      color: "#ea580c",
+      onPress: () =>
+        router.push(
+          (displayRole === "lawyer" || displayRole === "admin"
+            ? "/messages"
+            : "/notifications") as any
+        ),
+    },
+  ];
 
   if (loading) {
     return (
@@ -435,8 +483,8 @@ export default function DashboardScreen() {
       <View style={styles.welcomeSection}>
         <Text style={styles.welcomeTitle}>Dashboard</Text>
         <Text style={styles.welcomeSubtitle}>
-          Welcome back, {user?.name || "User"}. Here is your legal practice
-          overview.
+          Welcome back, {displayName}. Here is your {roleLabel.toLowerCase()}{" "}
+          overview{profileData?.specialization ? ` for ${profileData.specialization}` : ""}.
         </Text>
       </View>
 
@@ -586,30 +634,15 @@ export default function DashboardScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.quickActionsGrid}>
-          <QuickActionButton
-            icon="add-circle-outline"
-            label="New Case"
-            color="#2563eb"
-            onPress={() => router.push("/cases/new")}
-          />
-          <QuickActionButton
-            icon="document-attach-outline"
-            label="Upload Doc"
-            color="#16a34a"
-            onPress={() => router.push("/documents")}
-          />
-          <QuickActionButton
-            icon="calendar-outline"
-            label="Schedule"
-            color="#9333ea"
-            onPress={() => router.push("/calendar")}
-          />
-          <QuickActionButton
-            icon="people-outline"
-            label="Add Client"
-            color="#ea580c"
-            onPress={() => router.push("/clients")}
-          />
+          {quickActions.map((action) => (
+            <QuickActionButton
+              key={action.label}
+              icon={action.icon}
+              label={action.label}
+              color={action.color}
+              onPress={action.onPress}
+            />
+          ))}
         </View>
       </View>
 
