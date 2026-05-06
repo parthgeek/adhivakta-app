@@ -10,8 +10,6 @@ import {
   FlatList,
 } from "react-native";
 import { useState, useEffect } from "react";
-import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 
 // Types
@@ -24,12 +22,6 @@ type Event = {
   location: string;
   description: string;
   case: string;
-};
-
-type CaseItem = {
-  id: string;
-  _id?: string;
-  title: string;
 };
 
 // Event types with colors
@@ -100,14 +92,11 @@ const EventTypeModal = ({
 };
 
 export default function CalendarScreen() {
-  const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<Event[]>([]);
-  const [cases, setCases] = useState<CaseItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showTypeModal, setShowTypeModal] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [newEvent, setNewEvent] = useState({
     title: "",
     date: new Date(),
@@ -131,11 +120,6 @@ export default function CalendarScreen() {
       // ]);
 
       // Mock data
-      const mockCases: CaseItem[] = [
-        { id: "1", title: "Smith v. Johnson" },
-        { id: "2", title: "Estate of Williams" },
-      ];
-
       const mockEvents: Event[] = [
         {
           id: "1",
@@ -149,7 +133,6 @@ export default function CalendarScreen() {
         },
       ];
 
-      setCases(mockCases);
       setEvents(mockEvents);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -208,7 +191,6 @@ export default function CalendarScreen() {
   };
 
   const handleDayPress = (date: Date) => {
-    setSelectedDate(date);
     setNewEvent({ ...newEvent, date });
     setShowEventModal(true);
   };
@@ -234,31 +216,50 @@ export default function CalendarScreen() {
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
     >
-      {/* Header */}
-      <View style={styles.header}>
+      <View style={styles.heroCard}>
+        <View style={styles.heroBadge}>
+          <Ionicons name="calendar-outline" size={14} color="#c7d2fe" />
+          <Text style={styles.heroBadgeText}>Schedule workspace</Text>
+        </View>
+
         <View style={styles.headerRow}>
-          <TouchableOpacity onPress={goToPreviousMonth}>
-            <Ionicons name="chevron-back" size={24} color="#111" />
+          <TouchableOpacity
+            onPress={goToPreviousMonth}
+            style={styles.monthNavButton}
+          >
+            <Ionicons name="chevron-back" size={20} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {monthNames[currentMonth]} {currentYear}
-          </Text>
-          <TouchableOpacity onPress={goToNextMonth}>
-            <Ionicons name="chevron-forward" size={24} color="#111" />
+          <View style={styles.monthTitleBlock}>
+            <Text style={styles.headerTitle}>
+              {monthNames[currentMonth]} {currentYear}
+            </Text>
+            <Text style={styles.headerSubtitle}>
+              {events.length} scheduled event{events.length === 1 ? "" : "s"}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={goToNextMonth}
+            style={styles.monthNavButton}
+          >
+            <Ionicons name="chevron-forward" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
+
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => setShowEventModal(true)}
         >
-          <Ionicons name="add" size={24} color="#fff" />
+          <Ionicons name="add" size={18} color="#0f172a" />
           <Text style={styles.addButtonText}>Add Event</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Calendar Grid */}
       <View style={styles.calendar}>
-        {/* Day names */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Month View</Text>
+          <Text style={styles.sectionHint}>Tap a date to add</Text>
+        </View>
+
         <View style={styles.dayNamesRow}>
           {dayNames.map((day) => (
             <View key={day} style={styles.dayNameCell}>
@@ -267,7 +268,6 @@ export default function CalendarScreen() {
           ))}
         </View>
 
-        {/* Calendar days */}
         <View style={styles.daysGrid}>
           {calendarDays.map((day, index) => (
             <TouchableOpacity
@@ -318,9 +318,11 @@ export default function CalendarScreen() {
         </View>
       </View>
 
-      {/* Upcoming Events */}
       <View style={styles.upcomingSection}>
-        <Text style={styles.sectionTitle}>Upcoming Events</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Upcoming Events</Text>
+          <Text style={styles.sectionHint}>Next on calendar</Text>
+        </View>
         {events.length > 0 ? (
           events.map((event) => (
             <View key={event.id} style={styles.eventCard}>
@@ -359,7 +361,6 @@ export default function CalendarScreen() {
         )}
       </View>
 
-      {/* Add Event Modal */}
       <Modal visible={showEventModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: "80%" }]}>
@@ -456,19 +457,39 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#eef4fb",
   },
   contentContainer: {
     padding: 16,
+    paddingBottom: 120,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#eef4fb",
   },
-  header: {
-    marginBottom: 20,
+  heroCard: {
+    backgroundColor: "#0f2d5c",
+    borderRadius: 28,
+    padding: 18,
+    marginBottom: 16,
+  },
+  heroBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 16,
+  },
+  heroBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#dbeafe",
   },
   headerRow: {
     flexDirection: "row",
@@ -476,15 +497,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
+  monthNavButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  monthTitleBlock: {
+    flex: 1,
+    alignItems: "center",
+  },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#111",
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: -0.5,
+  },
+  headerSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: "#dbe7ff",
   },
   addButton: {
     flexDirection: "row",
-    backgroundColor: "#000",
-    borderRadius: 8,
+    backgroundColor: "#fff",
+    borderRadius: 999,
     paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: "center",
@@ -492,25 +533,34 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   addButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    color: "#0f172a",
+    fontSize: 15,
+    fontWeight: "700",
   },
   calendar: {
     backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 24,
+    padding: 14,
     marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
+    shadowColor: "#8da2bf",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginBottom: 12,
+    paddingHorizontal: 2,
   },
   dayNamesRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    borderBottomColor: "#edf2f7",
     paddingBottom: 8,
     marginBottom: 8,
   },
@@ -520,8 +570,8 @@ const styles = StyleSheet.create({
   },
   dayNameText: {
     fontSize: 12,
-    fontWeight: "600",
-    color: "#6b7280",
+    fontWeight: "700",
+    color: "#64748b",
   },
   daysGrid: {
     flexDirection: "row",
@@ -530,24 +580,25 @@ const styles = StyleSheet.create({
   dayCell: {
     width: "14.28%",
     aspectRatio: 1,
-    padding: 4,
+    padding: 6,
     borderWidth: 1,
-    borderColor: "#f3f4f6",
+    borderColor: "#f1f5f9",
+    borderRadius: 12,
   },
   emptyDayCell: {
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#f8fafc",
   },
   todayCell: {
-    backgroundColor: "#eff6ff",
-    borderColor: "#3b82f6",
+    backgroundColor: "#eef4ff",
+    borderColor: "#0f2d5c",
   },
   dayNumber: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#111",
+    fontWeight: "600",
+    color: "#0f172a",
   },
   todayNumber: {
-    color: "#3b82f6",
+    color: "#0f2d5c",
     fontWeight: "700",
   },
   eventsContainer: {
@@ -563,7 +614,7 @@ const styles = StyleSheet.create({
   },
   moreEvents: {
     fontSize: 8,
-    color: "#6b7280",
+    color: "#64748b",
     marginLeft: 2,
   },
   upcomingSection: {
@@ -571,21 +622,26 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "600",
-    color: "#111",
-    marginBottom: 12,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  sectionHint: {
+    fontSize: 12,
+    color: "#64748b",
   },
   eventCard: {
     flexDirection: "row",
     backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    borderRadius: 22,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
+    shadowColor: "#8da2bf",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 4,
   },
   eventIndicator: {
     width: 4,
@@ -597,8 +653,8 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#111",
+    fontWeight: "700",
+    color: "#0f172a",
     marginBottom: 6,
   },
   eventMeta: {
@@ -609,27 +665,31 @@ const styles = StyleSheet.create({
   },
   eventMetaText: {
     fontSize: 13,
-    color: "#6b7280",
+    color: "#64748b",
   },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 48,
+    backgroundColor: "#fff",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
+    paddingVertical: 42,
   },
   emptyStateText: {
     fontSize: 14,
-    color: "#9ca3af",
+    color: "#94a3b8",
     marginTop: 12,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(15, 23, 42, 0.45)",
     justifyContent: "flex-end",
   },
   modalContent: {
     backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingBottom: 20,
   },
   modalHeader: {
@@ -642,8 +702,8 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: "600",
-    color: "#111",
+    fontWeight: "700",
+    color: "#0f172a",
   },
   formContainer: {
     padding: 16,
@@ -653,19 +713,19 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#111",
+    fontWeight: "600",
+    color: "#0f172a",
     marginBottom: 8,
   },
   input: {
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
+    borderColor: "#dbe4f0",
+    borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    fontSize: 16,
-    color: "#111",
+    fontSize: 15,
+    color: "#0f172a",
   },
   textArea: {
     minHeight: 80,
@@ -677,18 +737,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
+    borderColor: "#dbe4f0",
+    borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 12,
   },
   selectButtonText: {
-    fontSize: 16,
-    color: "#111",
+    fontSize: 15,
+    color: "#0f172a",
   },
   submitButton: {
-    backgroundColor: "#000",
-    borderRadius: 8,
+    backgroundColor: "#0f2d5c",
+    borderRadius: 16,
     paddingVertical: 14,
     alignItems: "center",
     marginTop: 8,
@@ -713,7 +773,7 @@ const styles = StyleSheet.create({
   },
   typeItemText: {
     flex: 1,
-    fontSize: 16,
-    color: "#111",
+    fontSize: 15,
+    color: "#0f172a",
   },
 });

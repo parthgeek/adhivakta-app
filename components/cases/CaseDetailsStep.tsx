@@ -8,12 +8,11 @@ import {
     ScrollView,
     StyleSheet,
     Platform,
+    Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
-    CASE_TYPES,
     STATUSES,
-    PRIORITIES,
     CASE_STAGES,
 } from "../../constants/caseConstants";
 
@@ -40,31 +39,25 @@ const formatDateForInput = (date: Date | null | undefined) => {
     return `${year}-${month}-${day}`;
 };
 
-const parseDateInput = (value: string) => {
-    const trimmedValue = value.trim();
+const YEAR_OPTIONS = Array.from({ length: 51 }, (_, index) => {
+    const year = new Date().getFullYear() - index;
+    return { value: String(year), label: String(year) };
+});
 
-    if (!trimmedValue) return null;
-
-    const match = trimmedValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!match) return null;
-
-    const [, yearText, monthText, dayText] = match;
-    const year = Number(yearText);
-    const month = Number(monthText);
-    const day = Number(dayText);
-    const parsedDate = new Date(year, month - 1, day);
-
-    if (
-        Number.isNaN(parsedDate.getTime()) ||
-        parsedDate.getFullYear() !== year ||
-        parsedDate.getMonth() !== month - 1 ||
-        parsedDate.getDate() !== day
-    ) {
-        return null;
-    }
-
-    return parsedDate;
-};
+const MONTH_OPTIONS = [
+    { value: "0", label: "January" },
+    { value: "1", label: "February" },
+    { value: "2", label: "March" },
+    { value: "3", label: "April" },
+    { value: "4", label: "May" },
+    { value: "5", label: "June" },
+    { value: "6", label: "July" },
+    { value: "7", label: "August" },
+    { value: "8", label: "September" },
+    { value: "9", label: "October" },
+    { value: "10", label: "November" },
+    { value: "11", label: "December" },
+];
 
 // Simple picker modal component
 const PickerField = ({
@@ -157,39 +150,115 @@ const DateInputField = ({
     onChange: (date: Date | null) => void;
     hint: string;
 }) => {
-    const [draftValue, setDraftValue] = React.useState(formatDateForInput(value));
+    const [visible, setVisible] = React.useState(false);
+    const [tempDate, setTempDate] = React.useState<Date>(
+        value ? new Date(value) : new Date()
+    );
 
     React.useEffect(() => {
-        const formattedValue = formatDateForInput(value);
-
-        if (formattedValue) {
-            setDraftValue(formattedValue);
-            return;
-        }
-
-        setDraftValue((currentValue) => (currentValue ? currentValue : ""));
+        setTempDate(value ? new Date(value) : new Date());
     }, [value]);
+
+    const selectedYear = String(tempDate.getFullYear());
+    const selectedMonth = String(tempDate.getMonth());
+    const daysInMonth = new Date(
+        tempDate.getFullYear(),
+        tempDate.getMonth() + 1,
+        0
+    ).getDate();
+    const dayOptions = Array.from({ length: daysInMonth }, (_, index) => ({
+        value: String(index + 1),
+        label: String(index + 1).padStart(2, "0"),
+    }));
+
+    const updateTempDate = (parts: Partial<{ year: number; month: number; day: number }>) => {
+        const nextYear = parts.year ?? tempDate.getFullYear();
+        const nextMonth = parts.month ?? tempDate.getMonth();
+        const maxDay = new Date(nextYear, nextMonth + 1, 0).getDate();
+        const nextDay = Math.min(parts.day ?? tempDate.getDate(), maxDay);
+        setTempDate(new Date(nextYear, nextMonth, nextDay));
+    };
 
     return (
         <View style={styles.fieldContainer}>
             <Text style={styles.label}>
                 {label} {required && <Text style={styles.required}>*</Text>}
             </Text>
-            <View style={styles.dateInputWrapper}>
+            <TouchableOpacity
+                style={styles.dateInputWrapper}
+                onPress={() => setVisible(true)}
+            >
                 <Ionicons name="calendar-outline" size={18} color="#6b7280" />
-                <TextInput
-                    style={styles.dateInput}
-                    value={draftValue}
-                    onChangeText={(text) => {
-                        setDraftValue(text);
-                        onChange(parseDateInput(text));
-                    }}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#9ca3af"
-                    autoCapitalize="none"
-                />
-            </View>
+                <Text
+                    style={[
+                        styles.dateInput,
+                        !value && styles.pickerPlaceholder,
+                    ]}
+                >
+                    {value ? formatDateForInput(value) : "Select date"}
+                </Text>
+            </TouchableOpacity>
             <Text style={styles.hint}>{hint}</Text>
+            <Modal
+                visible={visible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>{label}</Text>
+                            <TouchableOpacity onPress={() => setVisible(false)}>
+                                <Ionicons name="close" size={22} color="#111" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <PickerField
+                            label="Year"
+                            options={YEAR_OPTIONS}
+                            value={selectedYear}
+                            onSelect={(year) => updateTempDate({ year: Number(year) })}
+                            required
+                        />
+                        <PickerField
+                            label="Month"
+                            options={MONTH_OPTIONS}
+                            value={selectedMonth}
+                            onSelect={(month) => updateTempDate({ month: Number(month) })}
+                            required
+                        />
+                        <PickerField
+                            label="Day"
+                            options={dayOptions}
+                            value={String(tempDate.getDate())}
+                            onSelect={(day) => updateTempDate({ day: Number(day) })}
+                            required
+                        />
+
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalButtonSecondary]}
+                                onPress={() => {
+                                    onChange(null);
+                                    setVisible(false);
+                                }}
+                            >
+                                <Text style={styles.modalButtonSecondaryText}>Clear</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalButtonPrimary]}
+                                onPress={() => {
+                                    onChange(tempDate);
+                                    setVisible(false);
+                                }}
+                            >
+                                <Text style={styles.modalButtonPrimaryText}>Done</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -228,28 +297,77 @@ export default function CaseDetailsStep({
                 />
             </View>
 
-            {/* Case Number */}
+            {/* Generated Case Number */}
             <View style={styles.fieldContainer}>
                 <Text style={styles.label}>
                     Case Number <Text style={styles.required}>*</Text>
                 </Text>
+                <View style={styles.readOnlyField}>
+                    <Text
+                        style={[
+                            styles.readOnlyValue,
+                            !caseData.caseNumber && styles.pickerPlaceholder,
+                        ]}
+                    >
+                        {caseData.caseNumber || "Select court and case type first"}
+                    </Text>
+                </View>
+                <Text style={styles.hint}>
+                    This is auto-generated from the selected case type, filing number, and year.
+                </Text>
+            </View>
+
+            <View style={styles.fieldContainer}>
+                <Text style={styles.label}>
+                    Filing Number <Text style={styles.required}>*</Text>
+                </Text>
                 <TextInput
                     style={styles.input}
-                    value={caseData.caseNumber}
-                    onChangeText={(text) => handleChange("caseNumber", text)}
-                    placeholder="e.g., CRL/123/2023"
+                    value={caseData.caseNumberMiddle}
+                    onChangeText={(text) => handleChange("caseNumberMiddle", text)}
+                    placeholder="Enter filing number"
                     placeholderTextColor="#9ca3af"
+                    keyboardType="number-pad"
                 />
             </View>
 
-            {/* Case Type */}
             <PickerField
-                label="Case Type"
-                options={CASE_TYPES}
-                value={caseData.caseType}
-                onSelect={(v) => handleSelectChange("caseType", v)}
+                label="Case Year"
+                options={YEAR_OPTIONS}
+                value={caseData.caseYear}
+                onSelect={(v) => handleSelectChange("caseYear", v)}
                 required
             />
+
+            <View style={styles.fieldContainer}>
+                <Text style={styles.label}>
+                    CNR Number <Text style={styles.required}>*</Text>
+                </Text>
+                <TextInput
+                    style={styles.input}
+                    value={caseData.cnrNumber}
+                    onChangeText={(text) => handleChange("cnrNumber", text)}
+                    placeholder="e.g., MHAU019999992015"
+                    placeholderTextColor="#9ca3af"
+                    autoCapitalize="characters"
+                />
+            </View>
+
+            <View style={styles.fieldContainer}>
+                <Text style={styles.label}>
+                    Case Type <Text style={styles.required}>*</Text>
+                </Text>
+                <View style={styles.readOnlyField}>
+                    <Text
+                        style={[
+                            styles.readOnlyValue,
+                            !caseData.caseSubType && styles.pickerPlaceholder,
+                        ]}
+                    >
+                        {caseData.caseSubType || "Select in Court Information"}
+                    </Text>
+                </View>
+            </View>
 
             {/* Status */}
             <PickerField
@@ -266,7 +384,7 @@ export default function CaseDetailsStep({
                 required
                 value={caseData.filingDate}
                 onChange={(date) => handleDateChange("filingDate", date)}
-                hint="Use YYYY-MM-DD. Hearing date must be after this date."
+                hint="Use selectors to choose the filing date."
             />
 
             {/* Next Hearing Date */}
@@ -275,15 +393,7 @@ export default function CaseDetailsStep({
                 required
                 value={caseData.nextHearingDate}
                 onChange={(date) => handleDateChange("nextHearingDate", date)}
-                hint="Use YYYY-MM-DD. This must be after the filing date."
-            />
-
-            {/* Priority */}
-            <PickerField
-                label="Priority"
-                options={PRIORITIES}
-                value={caseData.priority}
-                onSelect={(v) => handleSelectChange("priority", v)}
+                hint="This must be after the filing date."
             />
 
             {/* Case Stage */}
@@ -310,7 +420,9 @@ export default function CaseDetailsStep({
 
             {/* Description */}
             <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Case Description</Text>
+                <Text style={styles.label}>
+                    Case Description <Text style={styles.required}>*</Text>
+                </Text>
                 <TextInput
                     style={[styles.input, styles.textArea]}
                     value={caseData.description}
@@ -325,7 +437,9 @@ export default function CaseDetailsStep({
 
             {/* Act & Sections */}
             <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Act & Sections</Text>
+                <Text style={styles.label}>
+                    Act & Sections <Text style={styles.required}>*</Text>
+                </Text>
                 <TextInput
                     style={[styles.input, styles.textArea, { minHeight: 60 }]}
                     value={caseData.actSections}
@@ -340,7 +454,9 @@ export default function CaseDetailsStep({
 
             {/* Relief Sought */}
             <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Relief Sought</Text>
+                <Text style={styles.label}>
+                    Relief Sought <Text style={styles.required}>*</Text>
+                </Text>
                 <TextInput
                     style={[styles.input, styles.textArea, { minHeight: 60 }]}
                     value={caseData.reliefSought}
@@ -399,6 +515,18 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         paddingHorizontal: 14,
         paddingVertical: 12,
+        fontSize: 15,
+        color: "#111",
+    },
+    readOnlyField: {
+        backgroundColor: "#fff",
+        borderWidth: 1,
+        borderColor: "#e5e7eb",
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+    },
+    readOnlyValue: {
         fontSize: 15,
         color: "#111",
     },
@@ -485,6 +613,57 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 15,
         color: "#111",
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(17, 24, 39, 0.45)",
+        justifyContent: "flex-end",
+    },
+    modalCard: {
+        backgroundColor: "#fff",
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 20,
+        paddingBottom: 32,
+        maxHeight: "85%",
+    },
+    modalHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 12,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: "700",
+        color: "#111",
+    },
+    modalActions: {
+        flexDirection: "row",
+        justifyContent: "flex-end",
+        gap: 10,
+        marginTop: 8,
+    },
+    modalButton: {
+        borderRadius: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    modalButtonSecondary: {
+        backgroundColor: "#f3f4f6",
+    },
+    modalButtonPrimary: {
+        backgroundColor: "#000",
+    },
+    modalButtonSecondaryText: {
+        fontSize: 14,
+        fontWeight: "600",
+        color: "#374151",
+    },
+    modalButtonPrimaryText: {
+        fontSize: 14,
+        fontWeight: "600",
+        color: "#fff",
     },
     switchRow: {
         flexDirection: "row",

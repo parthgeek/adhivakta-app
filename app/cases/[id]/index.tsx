@@ -13,6 +13,11 @@ import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../../services/api";
 import { useAuth } from "../../../contexts/AuthContext";
+import {
+    formatCaseTypeLabel,
+    formatDisplayCaseNumber,
+} from "../../../lib/caseTypeUtils";
+import { getCasePriority } from "../../../lib/casePriority";
 
 // ========================
 // Helpers
@@ -208,13 +213,27 @@ export default function CaseDetailScreen() {
             ? { bg: "#dcfce7", text: "#166534" }
             : { bg: "#f3f4f6", text: "#374151" };
 
-    const priorityColors = getPriorityColor(caseData.priority);
+    const computedPriority = getCasePriority({
+        status: caseData.status,
+        nextHearingDate: caseData.nextHearingDate || caseData.hearingDate,
+    });
+    const priorityColors = getPriorityColor(computedPriority);
+    const formattedCaseNumber =
+        formatDisplayCaseNumber({
+            caseNumber: caseData.caseNumber || "",
+            caseTypeName:
+                caseData.caseSubType || caseData.eCourt?.caseTypeName || caseData.caseType || "",
+            caseTypeCode: caseData.eCourt?.caseTypeCode || caseData.caseCode || "",
+        }) || caseData.caseNumber;
+    const formattedCaseType = formatCaseTypeLabel(
+        caseData.caseSubType || caseData.caseType || ""
+    );
 
     return (
         <>
             <Stack.Screen
                 options={{
-                    title: caseData.caseNumber || "Case Details",
+                    title: formattedCaseNumber || "Case Details",
                     headerRight: () => (
                         <TouchableOpacity
                             style={styles.headerEditBtn}
@@ -259,7 +278,7 @@ export default function CaseDetailScreen() {
                         )}
                     </View>
 
-                    <Text style={styles.caseNumber}>{caseData.caseNumber}</Text>
+                    <Text style={styles.caseNumber}>{formattedCaseNumber}</Text>
 
                     <View style={styles.badgeRow}>
                         <View
@@ -273,15 +292,15 @@ export default function CaseDetailScreen() {
                             </Text>
                         </View>
 
-                        {caseData.caseType && (
+                        {formattedCaseType && (
                             <View style={[styles.badge, { backgroundColor: "#eff6ff" }]}>
                                 <Text style={[styles.badgeText, { color: "#1d4ed8" }]}>
-                                    {formatLabel(caseData.caseType)}
+                                    {formattedCaseType}
                                 </Text>
                             </View>
                         )}
 
-                        {caseData.priority && caseData.priority !== "normal" && (
+                        {computedPriority !== "normal" && (
                             <View
                                 style={[
                                     styles.badge,
@@ -291,7 +310,7 @@ export default function CaseDetailScreen() {
                                 <Text
                                     style={[styles.badgeText, { color: priorityColors.text }]}
                                 >
-                                    {formatLabel(caseData.priority)}
+                                    {formatLabel(computedPriority)}
                                 </Text>
                             </View>
                         )}
@@ -300,6 +319,26 @@ export default function CaseDetailScreen() {
 
                 {/* ── Case Information ── */}
                 <Section title="Case Information">
+                    <InfoRow
+                        icon="document-text-outline"
+                        label="Case Number"
+                        value={formattedCaseNumber}
+                    />
+                    <InfoRow
+                        icon="key-outline"
+                        label="CNR Number"
+                        value={caseData.cnrNumber || "Not available"}
+                    />
+                    <InfoRow
+                        icon="folder-outline"
+                        label="Case Type"
+                        value={formattedCaseType || "—"}
+                    />
+                    <InfoRow
+                        icon="flash-outline"
+                        label="Priority"
+                        value={formatLabel(computedPriority)}
+                    />
                     <InfoRow
                         icon="layers-outline"
                         label="Case Stage"

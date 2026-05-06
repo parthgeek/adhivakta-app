@@ -21,23 +21,29 @@ import CourtInfoStep from "../../components/cases/CourtInfoStep";
 import PartySectionStep from "../../components/cases/PartySectionStep";
 import DocumentsStep from "../../components/cases/DocumentsStep";
 import AssociatedPartiesStep from "../../components/cases/AssociatedPartiesStep";
-import { LAWYER_LEVELS } from "../../constants/caseConstants";
+import {
+    buildCaseNumber,
+    getBackendCaseType,
+    getEcourtCaseTypeReference,
+    normalizeCaseNumber,
+    normalizeFormattedCaseNumber,
+} from "../../lib/caseTypeUtils";
+import { getCasePriority } from "../../lib/casePriority";
 
 // ========================
 // Step Configuration
 // ========================
 const STEPS = [
-    { key: "details", title: "Case Details", icon: "document-text-outline" },
     { key: "court", title: "Court Info", icon: "business-outline" },
+    { key: "details", title: "Case Details", icon: "document-text-outline" },
     { key: "party", title: "Parties", icon: "people-outline" },
     { key: "documents", title: "Documents", icon: "folder-open-outline" },
     { key: "people", title: "People", icon: "people-circle-outline" },
 ] as const;
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
-const LAWYER_LEVEL_VALUES = new Set(
-    LAWYER_LEVELS.map((option) => option.value)
-);
+const CNR_NUMBER_PATTERN = /^[A-Z]{4}\d{12}$/;
+const DEFAULT_CASE_YEAR = String(new Date().getFullYear());
 
 const normalizeText = (value: string | null | undefined) => (value ?? "").trim();
 const normalizeEmail = (value: string | null | undefined) =>
@@ -58,8 +64,28 @@ const getStartOfDay = (value: Date | string | null | undefined) => {
     return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 };
 
-const normalizeCaseNumber = (value: string | null | undefined) =>
-    normalizeText(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
+const syncDerivedCaseFields = (caseInfo: any = {}) => {
+    const caseYear = caseInfo.caseYear || DEFAULT_CASE_YEAR;
+    const caseTypeName = caseInfo.eCourt?.caseTypeName || "";
+    const ecourtTypeCode = caseInfo.eCourt?.caseTypeCode || "";
+    const caseTypeReference = getEcourtCaseTypeReference({
+        caseTypeName,
+        caseTypeCode: ecourtTypeCode,
+    });
+
+    return {
+        ...caseInfo,
+        caseYear,
+        caseCode: caseTypeReference.caseCode,
+        caseType: getBackendCaseType(caseTypeReference.category),
+        caseSubType: normalizeText(caseTypeName),
+        caseNumber: buildCaseNumber({
+            caseCode: caseTypeReference.caseCode,
+            caseNumberMiddle: caseInfo.caseNumberMiddle,
+            caseYear,
+        }),
+    };
+};
 
 const DEFAULT_ECOURT_SELECTION = {
     source: "ecourts",
@@ -110,9 +136,14 @@ const SUPREME_COURT_ECOURT = {
 // ========================
 // Initial State
 // ========================
-const createInitialCaseData = () => ({
+const createInitialCaseData = () =>
+    syncDerivedCaseFields({
     title: "",
+    cnrNumber: "",
     caseNumber: "",
+    caseNumberMiddle: "",
+    caseYear: DEFAULT_CASE_YEAR,
+    caseCode: "",
     caseType: "",
     caseSubType: "",
     status: "active",
@@ -149,7 +180,7 @@ const createInitialCaseData = () => ({
 export default function NewCaseScreen() {
     const router = useRouter();
     const [currentStep, setCurrentStep] = useState(0);
-    const [caseData, setCaseData] = useState(createInitialCaseData);
+    const [caseData, setCaseData] = useState<any>(createInitialCaseData());
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [user, setUser] = useState<any>(null);
     const [isLawyer, setIsLawyer] = useState(true);
@@ -202,7 +233,25 @@ export default function NewCaseScreen() {
     // Handler Functions
     // ========================
     const handleChange = (name: string, value: string) => {
-        setCaseData((prev) => ({ ...prev, [name]: value }));
+        if (name === "caseNumberMiddle") {
+            setCaseData((prev: any) =>
+                syncDerivedCaseFields({
+                    ...prev,
+                    caseNumberMiddle: normalizeCaseNumber(value),
+                })
+            );
+            return;
+        }
+
+        if (name === "cnrNumber") {
+            setCaseData((prev: any) => ({
+                ...prev,
+                cnrNumber: value.toUpperCase(),
+            }));
+            return;
+        }
+
+        setCaseData((prev: any) => ({ ...prev, [name]: value }));
     };
 
     const setCourtLookupLoading = (
@@ -371,7 +420,8 @@ export default function NewCaseScreen() {
         setCourtDirectoryOptions(EMPTY_COURT_DIRECTORY_OPTIONS);
 
         if (newSource === "supremecourt") {
-            setCaseData((prev) => ({
+            setCaseData((prev: any) =>
+                syncDerivedCaseFields({
                 ...prev,
                 courtType: "supreme_court",
                 courtState: SUPREME_COURT_ECOURT.state,
@@ -379,9 +429,9 @@ export default function NewCaseScreen() {
                 bench: "",
                 court: SUPREME_COURT_ECOURT.court,
                 courtComplex: SUPREME_COURT_ECOURT.complex,
-                caseSubType: "",
                 eCourt: { ...SUPREME_COURT_ECOURT },
-            }));
+            })
+            );
 
             await loadCaseTypes(
                 SUPREME_COURT_ECOURT.stateCode,
@@ -393,7 +443,8 @@ export default function NewCaseScreen() {
             return;
         }
 
-        setCaseData((prev) => ({
+        setCaseData((prev: any) =>
+            syncDerivedCaseFields({
             ...prev,
             courtType: courtTypeMap[newSource] || "district_court",
             courtState: "",
@@ -401,37 +452,48 @@ export default function NewCaseScreen() {
             bench: "",
             court: "",
             courtComplex: "",
-            caseSubType: "",
             eCourt: {
                 ...DEFAULT_ECOURT_SELECTION,
                 source: newSource,
             },
-        }));
+        })
+        );
 
         await loadStates(newSource);
     };
 
     const handleSelectChange = async (name: string, value: string) => {
+        if (name === "caseYear") {
+            setCaseData((prev: any) =>
+                syncDerivedCaseFields({
+                    ...prev,
+                    caseYear: value,
+                })
+            );
+            return;
+        }
+
         if (name === "ecourtState") {
             const selectedState = courtDirectoryOptions.states.find(
                 (state: any) => state.code === value
             );
 
-            setCaseData((prev) => ({
+            setCaseData((prev: any) =>
+                syncDerivedCaseFields({
                 ...prev,
                 courtState: selectedState?.name || "",
                 district: "",
                 bench: "",
                 court: "",
                 courtComplex: "",
-                caseSubType: "",
                 eCourt: {
                     ...DEFAULT_ECOURT_SELECTION,
                     source: courtSource,
                     stateCode: value,
                     state: selectedState?.name || "",
                 },
-            }));
+            })
+            );
 
             setCourtDirectoryOptions((prev) => ({
                 ...prev,
@@ -451,13 +513,13 @@ export default function NewCaseScreen() {
             );
             const stateCode = caseData.eCourt?.stateCode || "";
 
-            setCaseData((prev) => ({
+            setCaseData((prev: any) =>
+                syncDerivedCaseFields({
                 ...prev,
                 district: selectedDistrict?.name || "",
                 bench: courtSource === "highcourts" ? selectedDistrict?.name || "" : "",
                 court: "",
                 courtComplex: "",
-                caseSubType: "",
                 eCourt: {
                     ...prev.eCourt,
                     districtCode: value,
@@ -470,7 +532,8 @@ export default function NewCaseScreen() {
                     caseTypeName: "",
                     requiresEstablishment: false,
                 },
-            }));
+            })
+            );
 
             setCourtDirectoryOptions((prev) => ({
                 ...prev,
@@ -490,12 +553,12 @@ export default function NewCaseScreen() {
             const stateCode = caseData.eCourt?.stateCode || "";
             const districtCode = caseData.eCourt?.districtCode || "";
 
-            setCaseData((prev) => ({
+            setCaseData((prev: any) =>
+                syncDerivedCaseFields({
                 ...prev,
                 courtComplex: selectedComplex?.name || "",
                 bench: courtSource === "highcourts" ? selectedComplex?.name || "" : prev.bench,
                 court: "",
-                caseSubType: "",
                 eCourt: {
                     ...prev.eCourt,
                     complexCode: value,
@@ -506,7 +569,8 @@ export default function NewCaseScreen() {
                     caseTypeName: "",
                     requiresEstablishment: false,
                 },
-            }));
+            })
+            );
 
             setCourtDirectoryOptions((prev) => ({
                 ...prev,
@@ -519,7 +583,8 @@ export default function NewCaseScreen() {
             if (courts.length === 1) {
                 const selectedCourt = courts[0];
 
-                setCaseData((prev) => ({
+                setCaseData((prev: any) =>
+                    syncDerivedCaseFields({
                     ...prev,
                     court: selectedCourt.name,
                     eCourt: {
@@ -529,7 +594,8 @@ export default function NewCaseScreen() {
                         caseTypeCode: "",
                         caseTypeName: "",
                     },
-                }));
+                })
+                );
 
                 const caseTypes = await loadCaseTypes(
                     stateCode,
@@ -540,9 +606,9 @@ export default function NewCaseScreen() {
                 );
 
                 if (caseTypes.length === 1) {
-                    setCaseData((prev) => ({
+                    setCaseData((prev: any) =>
+                        syncDerivedCaseFields({
                         ...prev,
-                        caseSubType: caseTypes[0].name,
                         eCourt: {
                             ...prev.eCourt,
                             courtCode: selectedCourt.code,
@@ -550,7 +616,8 @@ export default function NewCaseScreen() {
                             caseTypeCode: caseTypes[0].code,
                             caseTypeName: caseTypes[0].name,
                         },
-                    }));
+                    })
+                    );
                 }
             }
             return;
@@ -564,10 +631,10 @@ export default function NewCaseScreen() {
             const districtCode = caseData.eCourt?.districtCode || "";
             const complexCode = caseData.eCourt?.complexCode || "";
 
-            setCaseData((prev) => ({
+            setCaseData((prev: any) =>
+                syncDerivedCaseFields({
                 ...prev,
                 court: selectedCourt?.name || "",
-                caseSubType: "",
                 eCourt: {
                     ...prev.eCourt,
                     courtCode: value,
@@ -575,7 +642,8 @@ export default function NewCaseScreen() {
                     caseTypeCode: "",
                     caseTypeName: "",
                 },
-            }));
+            })
+            );
 
             setCourtDirectoryOptions((prev) => ({
                 ...prev,
@@ -591,9 +659,9 @@ export default function NewCaseScreen() {
             );
 
             if (caseTypes.length === 1) {
-                setCaseData((prev) => ({
+                setCaseData((prev: any) =>
+                    syncDerivedCaseFields({
                     ...prev,
-                    caseSubType: caseTypes[0].name,
                     eCourt: {
                         ...prev.eCourt,
                         courtCode: value,
@@ -601,7 +669,8 @@ export default function NewCaseScreen() {
                         caseTypeCode: caseTypes[0].code,
                         caseTypeName: caseTypes[0].name,
                     },
-                }));
+                })
+                );
             }
             return;
         }
@@ -611,27 +680,58 @@ export default function NewCaseScreen() {
                 (caseType: any) => caseType.code === value
             );
 
-            setCaseData((prev) => ({
+            setCaseData((prev: any) =>
+                syncDerivedCaseFields({
                 ...prev,
-                caseSubType: selectedCaseType?.name || "",
                 eCourt: {
                     ...prev.eCourt,
                     caseTypeCode: value,
                     caseTypeName: selectedCaseType?.name || "",
                 },
-            }));
+            })
+            );
             return;
         }
 
-        setCaseData((prev) => ({ ...prev, [name]: value }));
+        setCaseData((prev: any) =>
+            name === "caseType"
+                ? prev
+                : syncDerivedCaseFields({ ...prev, [name]: value })
+        );
     };
 
     const handleDateChange = (name: string, date: Date | null) => {
-        setCaseData((prev) => ({ ...prev, [name]: date }));
+        setCaseData((prev: any) => {
+            const newData = { ...prev, [name]: date };
+
+            if (name === "nextHearingDate" && newData.filingDate && date) {
+                if (new Date(date) <= new Date(newData.filingDate)) {
+                    Alert.alert(
+                        "Validation Error",
+                        "First hearing date must be after the filing date"
+                    );
+                    return prev;
+                }
+            }
+
+            if (name === "filingDate" && date) {
+                const today = new Date();
+                today.setHours(23, 59, 59, 999);
+                if (new Date(date) > today) {
+                    Alert.alert(
+                        "Validation Error",
+                        "Filing date cannot be in the future"
+                    );
+                    return prev;
+                }
+            }
+
+            return newData;
+        });
     };
 
     const handleCheckboxChange = (name: string, checked: boolean) => {
-        setCaseData((prev) => ({ ...prev, [name]: checked }));
+        setCaseData((prev: any) => ({ ...prev, [name]: checked }));
     };
 
     const handleFileChange = async () => {
@@ -678,7 +778,8 @@ export default function NewCaseScreen() {
             label: string,
             options?: {
                 requireEmail?: boolean;
-                requireLevel?: boolean;
+                requireCompany?: boolean;
+                requireContact?: boolean;
             }
         ) => {
             items.forEach((item, index) => {
@@ -693,49 +794,20 @@ export default function NewCaseScreen() {
                     errors.push(`${itemLabel} email is required`);
                 }
 
-                validateEmail(email, itemLabel);
-
-                if (
-                    options?.requireLevel &&
-                    !LAWYER_LEVEL_VALUES.has(normalizeText(item?.level))
-                ) {
-                    errors.push(
-                        `${itemLabel} level must be Senior, Junior, or Associate`
-                    );
+                if (options?.requireCompany && !normalizeText(item?.company)) {
+                    errors.push(`${itemLabel} law firm is required`);
                 }
+
+                if (options?.requireContact && !normalizeText(item?.contact)) {
+                    errors.push(`${itemLabel} mobile number is required`);
+                }
+
+                validateEmail(email, itemLabel);
             });
         };
 
         switch (stepIndex) {
-            case 0: // Details
-                if (!normalizeText(caseData.title)) errors.push("Case title is required");
-                if (!normalizeText(caseData.caseNumber)) {
-                    errors.push("Case number is required");
-                }
-                if (!caseData.caseType) errors.push("Case type is required");
-                if (!caseData.status) errors.push("Status is required");
-
-                if (!filingDate) {
-                    errors.push("Filing date is required");
-                }
-
-                if (filingDate && today && filingDate > today) {
-                    errors.push("Filing date cannot be in the future");
-                }
-
-                if (!nextHearingDate) {
-                    errors.push("First hearing date is required");
-                }
-
-                if (nextHearingDate && today && nextHearingDate <= today) {
-                    errors.push("First hearing date must be in the future");
-                }
-
-                if (filingDate && nextHearingDate && nextHearingDate <= filingDate) {
-                    errors.push("First hearing date must be after filing date");
-                }
-                break;
-            case 1: // Court
+            case 0: // Court
                 if (courtSource === "supremecourt") {
                     if (!normalizeText(caseData.eCourt?.caseTypeCode)) {
                         errors.push("Case type is required");
@@ -766,9 +838,62 @@ export default function NewCaseScreen() {
                     }
                 }
                 break;
+            case 1: // Details
+                if (!normalizeText(caseData.title)) {
+                    errors.push("Case title is required");
+                } else if (normalizeText(caseData.title).length < 3) {
+                    errors.push("Case title must be at least 3 characters");
+                }
+                if (!normalizeText(caseData.caseNumberMiddle)) {
+                    errors.push("Filing number is required");
+                }
+
+                const normalizedCnrNumber = normalizeText(caseData.cnrNumber).toUpperCase();
+                if (!normalizedCnrNumber) {
+                    errors.push("CNR number is required");
+                } else if (!CNR_NUMBER_PATTERN.test(normalizedCnrNumber)) {
+                    errors.push("Enter a valid CNR number like MHAU019999992015");
+                }
+
+                if (!normalizeText(caseData.caseYear)) {
+                    errors.push("Case year is required");
+                }
+                if (!normalizeText(caseData.caseType)) {
+                    errors.push("Select case type in Court Information first");
+                }
+                if (!caseData.status) errors.push("Status is required");
+                if (!normalizeText(caseData.description)) {
+                    errors.push("Case description is required");
+                }
+                if (!normalizeText(caseData.actSections)) {
+                    errors.push("Act and sections are required");
+                }
+                if (!normalizeText(caseData.reliefSought)) {
+                    errors.push("Relief sought is required");
+                }
+                if (!filingDate) {
+                    errors.push("Filing date is required");
+                }
+                if (filingDate && today && filingDate > today) {
+                    errors.push("Filing date cannot be in the future");
+                }
+                if (!nextHearingDate) {
+                    errors.push("First hearing date is required");
+                }
+                if (nextHearingDate && today && nextHearingDate < today) {
+                    errors.push("First hearing date must be in the future");
+                }
+                if (filingDate && nextHearingDate && nextHearingDate <= filingDate) {
+                    errors.push("First hearing date must be after filing date");
+                }
+                break;
             case 2: // Parties
                 if ((caseData.petitioners || []).length === 0) {
                     errors.push("Add at least one petitioner");
+                }
+
+                if ((caseData.respondents || []).length === 0) {
+                    errors.push("Add at least one respondent");
                 }
 
                 validateNamedPeople(caseData.petitioners || [], "Petitioner");
@@ -780,11 +905,13 @@ export default function NewCaseScreen() {
             case 4: // Associated Parties
                 validateNamedPeople(caseData.lawyers || [], "Lawyer", {
                     requireEmail: true,
-                    requireLevel: true,
+                    requireCompany: true,
+                    requireContact: true,
                 });
                 validateNamedPeople(caseData.advocates || [], "Advocate", {
                     requireEmail: true,
-                    requireLevel: true,
+                    requireCompany: true,
+                    requireContact: true,
                 });
                 validateNamedPeople(caseData.clients || [], "Client", {
                     requireEmail: true,
@@ -793,6 +920,15 @@ export default function NewCaseScreen() {
 
                 if (isLawyer && (caseData.clients || []).length === 0) {
                     errors.push("Add at least one client to the case");
+                }
+                if (isLawyer && (caseData.lawyers || []).length === 0) {
+                    errors.push("Add at least one lawyer");
+                }
+                if (!isLawyer && (caseData.clients || []).length === 0) {
+                    errors.push("Add a client");
+                }
+                if (!isLawyer && (caseData.advocates || []).length === 0) {
+                    errors.push("Add a lawyer");
                 }
                 break;
         }
@@ -905,13 +1041,17 @@ export default function NewCaseScreen() {
             // Format the payload to match the web app's formattedData
             const formattedData: any = {
                 title: normalizeText(caseData.title),
-                caseNumber: normalizeCaseNumber(caseData.caseNumber),
+                cnrNumber: normalizeText(caseData.cnrNumber).toUpperCase(),
+                caseNumber: normalizeFormattedCaseNumber(caseData.caseNumber),
                 caseType: caseData.caseType,
                 caseSubType: normalizeText(
                     caseData.eCourt?.caseTypeName || caseData.caseSubType
                 ),
                 status: caseData.status,
-                priority: caseData.priority,
+                priority: getCasePriority({
+                    status: caseData.status,
+                    nextHearingDate: caseData.nextHearingDate,
+                }),
                 caseStage: caseData.caseStage,
                 isUrgent: caseData.isUrgent,
                 description: normalizeText(caseData.description),
@@ -1049,16 +1189,6 @@ export default function NewCaseScreen() {
         switch (currentStep) {
             case 0:
                 return (
-                    <CaseDetailsStep
-                        caseData={caseData}
-                        handleChange={handleChange}
-                        handleSelectChange={handleSelectChange}
-                        handleDateChange={handleDateChange}
-                        handleCheckboxChange={handleCheckboxChange}
-                    />
-                );
-            case 1:
-                return (
                     <CourtInfoStep
                         caseData={caseData}
                         handleChange={handleChange}
@@ -1067,6 +1197,16 @@ export default function NewCaseScreen() {
                         courtDirectoryLoading={courtDirectoryLoading}
                         courtSource={courtSource}
                         handleCourtTypeChange={handleCourtTypeChange}
+                    />
+                );
+            case 1:
+                return (
+                    <CaseDetailsStep
+                        caseData={caseData}
+                        handleChange={handleChange}
+                        handleSelectChange={handleSelectChange}
+                        handleDateChange={handleDateChange}
+                        handleCheckboxChange={handleCheckboxChange}
                     />
                 );
             case 2:

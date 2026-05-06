@@ -194,6 +194,7 @@ export default function ProfileScreen() {
   return (
     <ScrollView
       style={styles.container}
+      contentContainerStyle={styles.contentContainer}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -201,7 +202,12 @@ export default function ProfileScreen() {
         />
       }
     >
-      <View style={styles.header}>
+      <View style={styles.heroCard}>
+        <View style={styles.heroBadge}>
+          <Shield color="#c7d2fe" size={14} />
+          <Text style={styles.heroBadgeText}>Profile workspace</Text>
+        </View>
+
         <View style={styles.profileInfo}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{getInitials(displayProfile.name)}</Text>
@@ -212,6 +218,21 @@ export default function ProfileScreen() {
             <Text style={styles.role}>{formatRole(displayProfile.role)}</Text>
           </View>
         </View>
+
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryPill}>
+            <Text style={styles.summaryValue}>{stats.notifications}</Text>
+            <Text style={styles.summaryLabel}>Unread</Text>
+          </View>
+          <View style={styles.summaryPill}>
+            <Text style={styles.summaryValue}>{stats.hearings}</Text>
+            <Text style={styles.summaryLabel}>Hearings</Text>
+          </View>
+          <View style={styles.summaryPill}>
+            <Text style={styles.summaryValue}>{stats.cases}</Text>
+            <Text style={styles.summaryLabel}>Cases</Text>
+          </View>
+        </View>
       </View>
 
       {!!errorMessage && (
@@ -220,26 +241,12 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      <View style={styles.stats}>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{stats.notifications}</Text>
-          <Text style={styles.statLabel}>Unread</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{stats.hearings}</Text>
-          <Text style={styles.statLabel}>Hearings</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{stats.cases}</Text>
-          <Text style={styles.statLabel}>Cases</Text>
-        </View>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Profile Information</Text>
+        <Text style={styles.sectionHint}>Account details</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Profile Information</Text>
-
         <View style={styles.detailRow}>
           <User color="#6b7280" size={18} />
           <View style={styles.detailContent}>
@@ -327,6 +334,11 @@ export default function ProfileScreen() {
         )}
       </View>
 
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Quick Access</Text>
+        <Text style={styles.sectionHint}>Navigate faster</Text>
+      </View>
+
       <View style={styles.menu}>
         {menuItems.map((item, index) => (
           <TouchableOpacity
@@ -359,19 +371,39 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#eef4fb",
+  },
+  contentContainer: {
+    padding: 16,
+    paddingBottom: 120,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#eef4fb",
   },
-  header: {
-    padding: 20,
-    backgroundColor: "white",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
+  heroCard: {
+    backgroundColor: "#0f2d5c",
+    borderRadius: 28,
+    padding: 18,
+    marginBottom: 14,
+  },
+  heroBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 16,
+  },
+  heroBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#dbeafe",
   },
   profileInfo: {
     flexDirection: "row",
@@ -380,8 +412,10 @@ const styles = StyleSheet.create({
   avatar: {
     width: 72,
     height: 72,
-    borderRadius: 36,
-    backgroundColor: "#007AFF",
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
@@ -397,72 +431,90 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 22,
     fontWeight: "700",
-    color: "#111827",
+    color: "#ffffff",
   },
   email: {
     fontSize: 14,
-    color: "#6b7280",
+    color: "#dbe7ff",
     marginTop: 2,
   },
   role: {
     fontSize: 13,
-    color: "#2563eb",
-    fontWeight: "600",
+    color: "#0f172a",
+    fontWeight: "700",
     marginTop: 8,
-    backgroundColor: "#dbeafe",
+    backgroundColor: "#ffffff",
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 999,
     alignSelf: "flex-start",
   },
+  summaryRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 18,
+  },
+  summaryPill: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  summaryValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#fff",
+  },
+  summaryLabel: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#c7d8f8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
   errorContainer: {
     backgroundColor: "#fee2e2",
-    marginHorizontal: 20,
-    marginTop: 16,
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 16,
+    marginBottom: 14,
   },
   errorText: {
     color: "#991b1b",
     fontSize: 13,
-    fontWeight: "500",
+    fontWeight: "600",
   },
-  stats: {
+  sectionHeader: {
     flexDirection: "row",
-    backgroundColor: "white",
-    marginTop: 1,
-    paddingVertical: 20,
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    paddingHorizontal: 2,
+    marginBottom: 10,
   },
-  statItem: {
-    flex: 1,
-    alignItems: "center",
-  },
-  statNumber: {
-    fontSize: 24,
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: "700",
-    color: "#111827",
+    color: "#0f172a",
   },
-  statLabel: {
-    fontSize: 14,
-    color: "#6b7280",
-    marginTop: 5,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: "#E5E5EA",
+  sectionHint: {
+    fontSize: 12,
+    color: "#64748b",
   },
   card: {
     backgroundColor: "#fff",
-    marginHorizontal: 20,
-    marginTop: 16,
-    borderRadius: 16,
+    borderRadius: 24,
     padding: 18,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
+    marginBottom: 16,
+    shadowColor: "#8da2bf",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 4,
   },
   detailRow: {
     flexDirection: "row",
@@ -481,21 +533,26 @@ const styles = StyleSheet.create({
   detailLabel: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#6b7280",
+    color: "#64748b",
     marginBottom: 4,
     textTransform: "uppercase",
   },
   detailValue: {
     fontSize: 15,
-    color: "#111827",
+    color: "#0f172a",
     lineHeight: 21,
   },
   menu: {
     backgroundColor: "white",
-    marginTop: 16,
-    borderRadius: 12,
+    borderRadius: 24,
     overflow: "hidden",
-    marginHorizontal: 20,
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
+    shadowColor: "#8da2bf",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 4,
   },
   menuItem: {
     flexDirection: "row",
@@ -503,7 +560,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#f5f5f5",
+    borderBottomColor: "#edf2f7",
   },
   menuItemLast: {
     borderBottomWidth: 0,
@@ -515,27 +572,28 @@ const styles = StyleSheet.create({
   menuIcon: {
     width: 36,
     height: 36,
-    borderRadius: 8,
-    backgroundColor: "#f0f0f5",
+    borderRadius: 12,
+    backgroundColor: "#eef4ff",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
   menuTitle: {
     fontSize: 16,
-    color: "#111827",
+    color: "#0f172a",
+    fontWeight: "600",
   },
   logoutButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "white",
-    marginHorizontal: 20,
-    marginTop: 20,
-    marginBottom: 30,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 20,
     gap: 10,
+    borderWidth: 1,
+    borderColor: "#f3d3d1",
+    marginTop: 16,
   },
   logoutText: {
     fontSize: 16,

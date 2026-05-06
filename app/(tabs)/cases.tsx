@@ -8,21 +8,29 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
+import {
+  formatCaseTypeLabel,
+  formatDisplayCaseNumber,
+  getCaseIdentifier,
+} from "../../lib/caseTypeUtils";
+import { getCasePriority } from "../../lib/casePriority";
 
 // Types
 type CaseItem = {
   id: string;
   title: string;
   number: string;
+  identifier: string;
   type: string;
   client?: string;
   court: string;
   status: string;
+  priority: string;
   nextHearing?: string;
 };
 
@@ -36,13 +44,6 @@ type ApiCase = {
   court?: string;
   status?: string;
   nextHearingDate?: string;
-};
-
-const formatCaseType = (value?: string) => {
-  if (!value) return "Other";
-  return value
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
 const formatCaseStatus = (value?: string) => {
@@ -65,13 +66,34 @@ const getClientName = (caseItem: ApiCase) => {
 const mapCaseFromApi = (caseItem: ApiCase): CaseItem => ({
   id: caseItem._id,
   title: caseItem.title || "Untitled Case",
-  number: caseItem.caseNumber || "N/A",
-  type: formatCaseType(caseItem.caseType),
+  number:
+    formatDisplayCaseNumber({
+      caseNumber: caseItem.caseNumber || "",
+      caseTypeName: (caseItem as any).caseSubType || (caseItem as any).eCourt?.caseTypeName || "",
+      caseTypeCode: (caseItem as any).eCourt?.caseTypeCode || (caseItem as any).caseCode || "",
+    }) || "N/A",
+  identifier: getCaseIdentifier(caseItem as any),
+  type: formatCaseTypeLabel((caseItem as any).caseSubType || caseItem.caseType || "other"),
   client: getClientName(caseItem),
   court: caseItem.court || "N/A",
   status: formatCaseStatus(caseItem.status),
+  priority: getCasePriority(caseItem as any),
   nextHearing: caseItem.nextHearingDate,
 });
+
+const formatHearingDate = (value?: string) => {
+  if (!value) return "No hearing listed";
+
+  try {
+    return new Date(value).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "No hearing listed";
+  }
+};
 
 // Case Row Component
 const CaseRow = ({
@@ -89,7 +111,20 @@ const CaseRow = ({
       : { bg: "#f3f4f6", text: "#374151" };
   };
 
+  const getPriorityColor = (priority: string) => {
+    switch (priority.toLowerCase()) {
+      case "urgent":
+        return { bg: "#fef2f2", text: "#dc2626" };
+      case "high":
+        return { bg: "#fff7ed", text: "#c2410c" };
+      default:
+        return { bg: "#f3f4f6", text: "#6b7280" };
+    }
+  };
+
   const statusColors = getStatusColor(caseItem.status);
+  const priorityColors = getPriorityColor(caseItem.priority);
+  const hasPriority = caseItem.priority !== "normal";
 
   return (
     <TouchableOpacity
@@ -97,28 +132,62 @@ const CaseRow = ({
       onPress={onPress}
       activeOpacity={0.7}
     >
+      <View
+        style={[
+          styles.caseAccent,
+          hasPriority
+            ? { backgroundColor: priorityColors.text }
+            : { backgroundColor: "#cbd5e1" },
+        ]}
+      />
       <View style={styles.caseRowContent}>
-        {/* Title & Number */}
-        <View style={styles.caseMainInfo}>
-          <Text style={styles.caseTitle} numberOfLines={1}>
-            {caseItem.title}
-          </Text>
-          <Text style={styles.caseNumber}>{caseItem.number}</Text>
+        <View style={styles.caseTopRow}>
+          <View style={styles.caseMainInfo}>
+            <Text style={styles.caseTitle} numberOfLines={1}>
+              {caseItem.title}
+            </Text>
+            <Text style={styles.caseNumber} numberOfLines={1}>
+              {caseItem.number}
+            </Text>
+            {caseItem.identifier && caseItem.identifier !== caseItem.number ? (
+              <Text style={styles.caseIdentifier} numberOfLines={1}>
+                {caseItem.identifier}
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={styles.topBadges}>
+            <View
+              style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}
+            >
+              <Text style={[styles.statusText, { color: statusColors.text }]}>
+                {caseItem.status}
+              </Text>
+            </View>
+            {hasPriority ? (
+              <View
+                style={[styles.statusBadge, { backgroundColor: priorityColors.bg }]}
+              >
+                <Text style={[styles.statusText, { color: priorityColors.text }]}>
+                  {caseItem.priority.charAt(0).toUpperCase() + caseItem.priority.slice(1)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
 
-        {/* Type & Client */}
-        <View style={styles.caseMetaInfo}>
-          <View style={styles.metaRow}>
+        <View style={styles.metaGrid}>
+          <View style={styles.metaPill}>
             <Ionicons name="folder-outline" size={14} color="#6b7280" />
             <Text style={styles.metaText}>{caseItem.type}</Text>
           </View>
           {isLawyer && caseItem.client && (
-            <View style={styles.metaRow}>
+            <View style={styles.metaPill}>
               <Ionicons name="person-outline" size={14} color="#6b7280" />
               <Text style={styles.metaText}>{caseItem.client}</Text>
             </View>
           )}
-          <View style={styles.metaRow}>
+          <View style={styles.metaPill}>
             <Ionicons name="business-outline" size={14} color="#6b7280" />
             <Text style={styles.metaText} numberOfLines={1}>
               {caseItem.court}
@@ -126,26 +195,14 @@ const CaseRow = ({
           </View>
         </View>
 
-        {/* Status & Next Hearing */}
         <View style={styles.caseFooter}>
-          <View
-            style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}
-          >
-            <Text style={[styles.statusText, { color: statusColors.text }]}>
-              {caseItem.status}
-            </Text>
+          <View style={styles.hearingInfo}>
+            <Ionicons name="calendar-outline" size={15} color="#64748b" />
+            <Text style={styles.hearingLabel}>Next hearing</Text>
           </View>
-          {caseItem.nextHearing && (
-            <View style={styles.hearingInfo}>
-              <Ionicons name="calendar-outline" size={14} color="#6b7280" />
-              <Text style={styles.hearingText}>
-                {new Date(caseItem.nextHearing).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })}
-              </Text>
-            </View>
-          )}
+          <Text style={styles.hearingText}>
+            {formatHearingDate(caseItem.nextHearing)}
+          </Text>
         </View>
       </View>
       <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
@@ -202,6 +259,7 @@ export default function CasesScreen() {
     const matchesSearch =
       caseItem.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       caseItem.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      caseItem.identifier.toLowerCase().includes(searchTerm.toLowerCase()) ||
       caseItem.court.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus =
@@ -211,87 +269,96 @@ export default function CasesScreen() {
     return matchesSearch && matchesStatus;
   });
 
+  const summary = useMemo(() => {
+    const active = cases.filter((item) => item.status.toLowerCase() === "active").length;
+    const urgent = cases.filter((item) => item.priority === "urgent").length;
+    const upcoming = cases.filter((item) => Boolean(item.nextHearing)).length;
+
+    return [
+      { label: "Total", value: String(cases.length) },
+      { label: "Active", value: String(active) },
+      { label: "Urgent", value: String(urgent) },
+      { label: "Listed", value: String(upcoming) },
+    ];
+  }, [cases]);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#000" />
+        <ActivityIndicator size="large" color="#0f2d5c" />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.headerTitle}>
-              {isLawyer ? "All Cases" : "My Cases"}
-            </Text>
-            <Text style={styles.headerSubtitle}>
-              {filteredCases.length}{" "}
-              {filteredCases.length === 1 ? "case" : "cases"}
-            </Text>
-          </View>
-        </View>
-
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Ionicons
-            name="search-outline"
-            size={20}
-            color="#6b7280"
-            style={styles.searchIcon}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search cases..."
-            placeholderTextColor="#9ca3af"
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-          />
-          <TouchableOpacity
-            style={styles.filterButton}
-            onPress={() => setShowFilters(!showFilters)}
-          >
-            <Ionicons
-              name={showFilters ? "close" : "filter-outline"}
-              size={20}
-              color="#111"
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Filters */}
-        {showFilters && (
-          <View style={styles.filtersContainer}>
-            <Text style={styles.filterLabel}>Status:</Text>
-            <View style={styles.filterButtons}>
-              {["All", "Active", "Closed"].map((status) => (
-                <TouchableOpacity
-                  key={status}
-                  style={[
-                    styles.filterChip,
-                    statusFilter === status && styles.filterChipActive,
-                  ]}
-                  onPress={() => setStatusFilter(status)}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      statusFilter === status && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {status}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+        <View style={styles.controlsCard}>
+          <View style={styles.toolbar}>
+            <View style={styles.searchContainer}>
+              <Ionicons
+                name="search-outline"
+                size={20}
+                color="#64748b"
+                style={styles.searchIcon}
+              />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search title, number, court..."
+                placeholderTextColor="#94a3b8"
+                value={searchTerm}
+                onChangeText={setSearchTerm}
+              />
             </View>
+
+            <TouchableOpacity
+              style={[styles.filterToggle, showFilters && styles.filterToggleActive]}
+              onPress={() => setShowFilters(!showFilters)}
+            >
+              <Ionicons
+                name={showFilters ? "close" : "options-outline"}
+                size={18}
+                color={showFilters ? "#fff" : "#0f172a"}
+              />
+            </TouchableOpacity>
           </View>
-        )}
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterButtons}
+          >
+            {["All", "Active", "Closed"].map((status) => (
+              <TouchableOpacity
+                key={status}
+                style={[
+                  styles.filterChip,
+                  statusFilter === status && styles.filterChipActive,
+                ]}
+                onPress={() => setStatusFilter(status)}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    statusFilter === status && styles.filterChipTextActive,
+                  ]}
+                >
+                  {status}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {showFilters ? (
+            <View style={styles.filterHint}>
+              <Text style={styles.filterHintText}>
+                Search matches title, case number, identifier, and court.
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
-      {/* Cases List */}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -300,6 +367,50 @@ export default function CasesScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        <View style={styles.heroCard}>
+          <View style={styles.heroBadge}>
+            <Ionicons name="layers-outline" size={14} color="#c7d2fe" />
+            <Text style={styles.heroBadgeText}>Case workspace</Text>
+          </View>
+
+          <View style={styles.headerTop}>
+            <View style={styles.headerCopy}>
+              <Text style={styles.headerTitle}>
+                {isLawyer ? "All Cases" : "My Cases"}
+              </Text>
+              <Text style={styles.headerSubtitle}>
+                {filteredCases.length}{" "}
+                {filteredCases.length === 1 ? "case" : "cases"} in view
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.addCaseButton}
+              onPress={() => router.push("/cases/new")}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add" size={16} color="#0f172a" />
+              <Text style={styles.addCaseButtonText}>New</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.summaryRow}>
+            {summary.map((item) => (
+              <View key={item.label} style={styles.summaryPill}>
+                <Text style={styles.summaryValue}>{item.value}</Text>
+                <Text style={styles.summaryLabel}>{item.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.listHeader}>
+          <Text style={styles.listTitle}>Case List</Text>
+          <Text style={styles.listSubtitle}>
+            {statusFilter === "All" ? "All statuses" : statusFilter} • {filteredCases.length} shown
+          </Text>
+        </View>
+
         {filteredCases.length > 0 ? (
           filteredCases.map((caseItem) => (
             <CaseRow
@@ -311,7 +422,9 @@ export default function CasesScreen() {
           ))
         ) : (
           <View style={styles.emptyState}>
-            <Ionicons name="folder-open-outline" size={64} color="#d1d5db" />
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="folder-open-outline" size={34} color="#94a3b8" />
+            </View>
             <Text style={styles.emptyStateTitle}>No cases found</Text>
             <Text style={styles.emptyStateText}>
               {errorMessage
@@ -330,7 +443,6 @@ export default function CasesScreen() {
         )}
       </ScrollView>
 
-      {/* Add Case FAB */}
       <TouchableOpacity
         style={styles.fab}
         onPress={() => router.push("/cases/new")}
@@ -345,37 +457,115 @@ export default function CasesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#eef4fb",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#eef4fb",
   },
   header: {
-    backgroundColor: "#fff",
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+  },
+  controlsCard: {
+    backgroundColor: "rgba(255,255,255,0.72)",
+    borderRadius: 24,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
+  },
+  heroCard: {
+    backgroundColor: "#0f2d5c",
+    borderRadius: 28,
+    padding: 18,
+    marginBottom: 16,
+    overflow: "hidden",
+  },
+  heroBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 14,
+  },
+  heroBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#dbeafe",
   },
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
+    gap: 12,
     marginBottom: 16,
   },
+  headerCopy: {
+    flex: 1,
+  },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#111",
+    fontSize: 31,
+    fontWeight: "800",
+    color: "#ffffff",
+    letterSpacing: -0.7,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: "#6b7280",
+    color: "#d7e6ff",
     marginTop: 4,
+  },
+  addCaseButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#ffffff",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  addCaseButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  summaryRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  summaryPill: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  summaryValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#ffffff",
+    marginBottom: 2,
+  },
+  summaryLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#c7d8f8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  toolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 12,
   },
   fab: {
     position: "absolute",
@@ -384,170 +574,251 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#000",
+    backgroundColor: "#0f172a",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: "#0f172a",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
   },
   searchContainer: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f3f4f6",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 48,
+    backgroundColor: "#ffffff",
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    height: 54,
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
   },
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    color: "#111",
+    fontSize: 15,
+    color: "#0f172a",
   },
-  filterButton: {
-    padding: 8,
+  filterToggle: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
   },
-  filtersContainer: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-  },
-  filterLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#111",
-    marginBottom: 8,
+  filterToggleActive: {
+    backgroundColor: "#0f2d5c",
+    borderColor: "#0f2d5c",
   },
   filterButtons: {
-    flexDirection: "row",
     gap: 8,
+    paddingRight: 4,
   },
   filterChip: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#f3f4f6",
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: "#ffffff",
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: "#dbe4f0",
   },
   filterChipActive: {
-    backgroundColor: "#000",
-    borderColor: "#000",
+    backgroundColor: "#0f172a",
+    borderColor: "#0f172a",
   },
   filterChipText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#6b7280",
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#64748b",
   },
   filterChipTextActive: {
     color: "#fff",
+  },
+  filterHint: {
+    marginTop: 10,
+    paddingHorizontal: 2,
+  },
+  filterHintText: {
+    fontSize: 12,
+    color: "#64748b",
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     padding: 16,
+    paddingTop: 0,
+    paddingBottom: 96,
+  },
+  listHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    gap: 12,
+    marginBottom: 12,
+    paddingHorizontal: 2,
+  },
+  listTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  listSubtitle: {
+    fontSize: 12,
+    color: "#64748b",
   },
   caseRow: {
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 24,
     padding: 16,
     marginBottom: 12,
     flexDirection: "row",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    alignItems: "stretch",
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
+    shadowColor: "#8da2bf",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  caseAccent: {
+    width: 4,
+    borderRadius: 999,
+    marginRight: 14,
   },
   caseRowContent: {
     flex: 1,
   },
+  caseTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 12,
+  },
   caseMainInfo: {
-    marginBottom: 8,
+    flex: 1,
   },
   caseTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111",
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#0f172a",
     marginBottom: 4,
   },
   caseNumber: {
     fontSize: 13,
-    color: "#6b7280",
+    color: "#475569",
+    fontWeight: "600",
   },
-  caseMetaInfo: {
+  caseIdentifier: {
+    fontSize: 12,
+    color: "#94a3b8",
+    marginTop: 3,
+  },
+  topBadges: {
+    alignItems: "flex-end",
     gap: 6,
+  },
+  metaGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
     marginBottom: 12,
   },
-  metaRow: {
+  metaPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    backgroundColor: "#f8fafc",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
   metaText: {
-    fontSize: 13,
-    color: "#6b7280",
-    flex: 1,
+    fontSize: 12,
+    color: "#475569",
+    maxWidth: 210,
   },
   caseFooter: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#edf2f7",
   },
   statusBadge: {
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: "500",
+    fontSize: 11,
+    fontWeight: "700",
   },
   hearingInfo: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 5,
+  },
+  hearingLabel: {
+    fontSize: 12,
+    color: "#64748b",
   },
   hearingText: {
     fontSize: 12,
-    color: "#6b7280",
-    fontWeight: "500",
+    color: "#0f172a",
+    fontWeight: "700",
   },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 64,
+    backgroundColor: "#ffffff",
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
+    paddingHorizontal: 24,
+    paddingVertical: 56,
+  },
+  emptyIconWrap: {
+    width: 74,
+    height: 74,
+    borderRadius: 22,
+    backgroundColor: "#f8fafc",
+    alignItems: "center",
+    justifyContent: "center",
   },
   emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#111",
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#0f172a",
     marginTop: 16,
     marginBottom: 8,
   },
   emptyStateText: {
     fontSize: 14,
-    color: "#6b7280",
+    lineHeight: 21,
+    color: "#64748b",
     textAlign: "center",
     marginBottom: 24,
   },
   emptyStateButton: {
-    backgroundColor: "#000",
+    backgroundColor: "#0f172a",
     paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: 13,
+    borderRadius: 999,
   },
   emptyStateButtonText: {
     color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "700",
   },
 });

@@ -285,6 +285,11 @@ const api = {
     },
 
     documents: {
+        getAll: (params?: Record<string, string>) => {
+            const query = params ? `?${new URLSearchParams(params).toString()}` : "";
+            return request(`/documents${query}`);
+        },
+
         uploadToCaseId: (
             caseId: string,
             formData: FormData,

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   FlatList,
-  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -51,6 +50,9 @@ const getRelativeTime = (dateString: string) => {
 
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
+
+const formatNotificationTitle = (value: string) =>
+  value.replace(/_/g, " ").replace(/\b\w/g, (match) => match.toUpperCase());
 
 export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -109,6 +111,8 @@ export default function NotificationsScreen() {
     fetchNotifications();
   };
 
+  const unreadCount = notifications.filter((item) => !item.read).length;
+
   const renderItem = ({ item }: { item: NotificationItem }) => {
     const icon = getNotificationIcon(item.type);
 
@@ -122,7 +126,7 @@ export default function NotificationsScreen() {
         </View>
         <View style={styles.textContainer}>
           <View style={styles.headerRow}>
-            <Text style={styles.title}>{item.type.replace(/_/g, " ")}</Text>
+            <Text style={styles.title}>{formatNotificationTitle(item.type)}</Text>
             <Text style={styles.time}>{getRelativeTime(item.createdAt)}</Text>
           </View>
           <Text style={styles.message} numberOfLines={2}>
@@ -143,7 +147,7 @@ export default function NotificationsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {!!errorMessage && (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{errorMessage}</Text>
@@ -158,57 +162,181 @@ export default function NotificationsScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <View style={styles.heroCard}>
+              <View style={styles.heroBadge}>
+                <Ionicons name="notifications-outline" color="#c7d2fe" size={14} />
+                <Text style={styles.heroBadgeText}>Alerts workspace</Text>
+              </View>
+
+              <Text style={styles.heroTitle}>Notifications</Text>
+              <Text style={styles.heroSubtitle}>
+                {notifications.length} update{notifications.length === 1 ? "" : "s"} in your
+                feed
+              </Text>
+
+              <View style={styles.summaryRow}>
+                <View style={styles.summaryPill}>
+                  <Text style={styles.summaryValue}>{unreadCount}</Text>
+                  <Text style={styles.summaryLabel}>Unread</Text>
+                </View>
+                <View style={styles.summaryPill}>
+                  <Text style={styles.summaryValue}>
+                    {notifications.length - unreadCount}
+                  </Text>
+                  <Text style={styles.summaryLabel}>Read</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Recent Activity</Text>
+              <Text style={styles.sectionHint}>Tap to mark read</Text>
+            </View>
+          </View>
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="notifications-outline" color="#C7C7CC" size={64} />
-            <Text style={styles.emptyText}>No notifications yet</Text>
+            <Text style={styles.emptyTitle}>No notifications yet</Text>
+            <Text style={styles.emptyText}>Updates and reminders will appear here.</Text>
           </View>
         }
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#eef4fb",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#eef4fb",
+  },
+  listHeader: {
+    marginBottom: 8,
+  },
+  heroCard: {
+    backgroundColor: "#0f2d5c",
+    borderRadius: 28,
+    padding: 18,
+    marginBottom: 14,
+  },
+  heroBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 16,
+  },
+  heroBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#dbeafe",
+  },
+  heroTitle: {
+    fontSize: 30,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: -0.6,
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    color: "#dbe7ff",
+    marginTop: 4,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 16,
+  },
+  summaryPill: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  summaryValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#fff",
+  },
+  summaryLabel: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#c7d8f8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    paddingHorizontal: 2,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  sectionHint: {
+    fontSize: 12,
+    color: "#64748b",
   },
   errorContainer: {
     marginHorizontal: 16,
     marginTop: 12,
     backgroundColor: "#fee2e2",
-    borderRadius: 10,
+    borderRadius: 16,
     padding: 12,
   },
   errorText: {
     color: "#991b1b",
     fontSize: 13,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   listContent: {
-    paddingVertical: 8,
+    padding: 16,
+    paddingTop: 12,
+    paddingBottom: 120,
   },
   notificationItem: {
     flexDirection: "row",
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F2F2F7",
+    backgroundColor: "#fff",
+    borderRadius: 22,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
+    marginBottom: 10,
+    shadowColor: "#8da2bf",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 4,
   },
   unreadItem: {
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#f8fbff",
   },
   iconContainer: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
@@ -225,34 +353,46 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#1C1C1E",
+    fontWeight: "700",
+    color: "#0f172a",
     textTransform: "capitalize",
   },
   time: {
     fontSize: 12,
-    color: "#8E8E93",
+    color: "#94a3b8",
   },
   message: {
     fontSize: 14,
-    color: "#3A3A3C",
+    color: "#475569",
     lineHeight: 20,
   },
   unreadDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#2563eb",
+    backgroundColor: "#0f2d5c",
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
     alignItems: "center",
-    marginTop: 100,
+    justifyContent: "center",
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
+    paddingVertical: 56,
+    paddingHorizontal: 20,
+    marginTop: 8,
+  },
+  emptyTitle: {
+    marginTop: 16,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0f172a",
   },
   emptyText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: "#8E8E93",
+    marginTop: 8,
+    fontSize: 14,
+    color: "#64748b",
+    textAlign: "center",
   },
 });

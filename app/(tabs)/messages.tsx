@@ -259,22 +259,56 @@ export default function MessagesScreen() {
   if (view === "groups") {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Messages</Text>
-          <Text style={styles.headerSubtitle}>{groups.length} group(s)</Text>
-        </View>
-
-        {!!errorMessage && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{errorMessage}</Text>
-          </View>
-        )}
-
         <FlatList
           data={groups}
           keyExtractor={(item) => item._id}
+          contentContainerStyle={styles.groupsListContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListHeaderComponent={
+            <View style={styles.groupsHeaderBlock}>
+              <View style={styles.heroCard}>
+                <View style={styles.heroBadge}>
+                  <Ionicons
+                    name="chatbubbles-outline"
+                    size={14}
+                    color="#c7d2fe"
+                  />
+                  <Text style={styles.heroBadgeText}>Inbox workspace</Text>
+                </View>
+
+                <Text style={styles.headerTitle}>Messages</Text>
+                <Text style={styles.headerSubtitle}>
+                  {groups.length} conversation{groups.length === 1 ? "" : "s"} in
+                  your workspace
+                </Text>
+
+                <View style={styles.summaryRow}>
+                  <View style={styles.summaryPill}>
+                    <Text style={styles.summaryValue}>{groups.length}</Text>
+                    <Text style={styles.summaryLabel}>Groups</Text>
+                  </View>
+                  <View style={styles.summaryPill}>
+                    <Text style={styles.summaryValue}>
+                      {groups.filter((group) => (group.unreadCount || 0) > 0).length}
+                    </Text>
+                    <Text style={styles.summaryLabel}>Unread</Text>
+                  </View>
+                </View>
+              </View>
+
+              {!!errorMessage && (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+              )}
+
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Recent Conversations</Text>
+                <Text style={styles.sectionHint}>Tap to open</Text>
+              </View>
+            </View>
           }
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -339,6 +373,7 @@ export default function MessagesScreen() {
     >
       <View style={styles.chatHeader}>
         <TouchableOpacity
+          style={styles.backButton}
           onPress={() => {
             setView("groups");
             setActiveGroup(null);
@@ -368,6 +403,16 @@ export default function MessagesScreen() {
           data={messages}
           keyExtractor={(item) => item._id}
           contentContainerStyle={styles.messagesContainer}
+          ListHeaderComponent={
+            <View style={styles.chatBanner}>
+              <Text style={styles.chatBannerTitle}>
+                {groups.find((group) => group._id === activeGroup)?.name}
+              </Text>
+              <Text style={styles.chatBannerText}>
+                Conversation stays linked to the case workspace.
+              </Text>
+            </View>
+          }
           renderItem={({ item }) => {
             const isCurrentUser = item.sender._id === user?.id;
             return (
@@ -459,54 +504,127 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#eef4fb",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#eef4fb",
   },
-  header: {
+  groupsListContent: {
     padding: 16,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    paddingBottom: 120,
+  },
+  groupsHeaderBlock: {
+    marginBottom: 8,
+  },
+  heroCard: {
+    backgroundColor: "#0f2d5c",
+    borderRadius: 28,
+    padding: 18,
+    marginBottom: 14,
+  },
+  heroBadge: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 14,
+  },
+  heroBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#dbeafe",
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#111",
+    fontSize: 30,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: -0.6,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: "#6b7280",
+    color: "#dbe7ff",
     marginTop: 4,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 16,
+  },
+  summaryPill: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  summaryValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#fff",
+  },
+  summaryLabel: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#c7d8f8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
   },
   errorContainer: {
     backgroundColor: "#fee2e2",
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 10,
+    borderRadius: 16,
     padding: 12,
+    marginBottom: 14,
   },
   errorText: {
     color: "#991b1b",
     fontSize: 13,
-    fontWeight: "500",
+    fontWeight: "600",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    paddingHorizontal: 2,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  sectionHint: {
+    fontSize: 12,
+    color: "#64748b",
   },
   groupItem: {
     flexDirection: "row",
     padding: 16,
     backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
+    marginBottom: 10,
+    shadowColor: "#8da2bf",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 4,
   },
   groupIconContainer: {
     width: 48,
     height: 48,
-    borderRadius: 24,
-    backgroundColor: "#3b82f6",
+    borderRadius: 16,
+    backgroundColor: "#0f2d5c",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -522,13 +640,13 @@ const styles = StyleSheet.create({
   },
   groupName: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#111",
+    fontWeight: "700",
+    color: "#0f172a",
     flex: 1,
   },
   groupTime: {
     fontSize: 12,
-    color: "#9ca3af",
+    color: "#94a3b8",
   },
   groupFooter: {
     flexDirection: "row",
@@ -537,68 +655,103 @@ const styles = StyleSheet.create({
   },
   groupLastMessage: {
     fontSize: 14,
-    color: "#6b7280",
+    color: "#64748b",
     flex: 1,
   },
   unreadMessage: {
     fontWeight: "700",
-    color: "#111",
+    color: "#0f172a",
   },
   unreadBadge: {
-    backgroundColor: "#ef4444",
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    backgroundColor: "#0f2d5c",
+    borderRadius: 999,
+    minWidth: 24,
+    height: 24,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
   },
   unreadBadgeText: {
     color: "#fff",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
   },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 64,
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
+    paddingVertical: 56,
+    paddingHorizontal: 20,
+    marginTop: 8,
   },
   emptyStateTitle: {
     fontSize: 18,
-    fontWeight: "600",
-    color: "#111",
+    fontWeight: "700",
+    color: "#0f172a",
     marginTop: 16,
     marginBottom: 8,
   },
   emptyStateText: {
     fontSize: 14,
-    color: "#6b7280",
+    color: "#64748b",
     textAlign: "center",
   },
   chatHeader: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 14,
+    backgroundColor: "#eef4fb",
     gap: 12,
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
+    alignItems: "center",
+    justifyContent: "center",
   },
   chatHeaderInfo: {
     flex: 1,
   },
   chatHeaderTitle: {
     fontSize: 18,
-    fontWeight: "600",
-    color: "#111",
+    fontWeight: "700",
+    color: "#0f172a",
   },
   chatHeaderSubtitle: {
     fontSize: 13,
-    color: "#6b7280",
+    color: "#64748b",
     marginTop: 2,
   },
   messagesContainer: {
     padding: 16,
+    paddingBottom: 120,
+  },
+  chatBanner: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
+    padding: 14,
+    marginBottom: 18,
+  },
+  chatBannerTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#0f172a",
+    marginBottom: 4,
+  },
+  chatBannerText: {
+    fontSize: 13,
+    color: "#64748b",
   },
   messageWrapper: {
     flexDirection: "row",
@@ -616,7 +769,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#6b7280",
+    backgroundColor: "#0f2d5c",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 8,
@@ -627,16 +780,16 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   messageBubble: {
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 12,
   },
   messageBubbleLeft: {
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: "#dbe4f0",
   },
   messageBubbleRight: {
-    backgroundColor: "#3b82f6",
+    backgroundColor: "#0f2d5c",
   },
   senderName: {
     fontSize: 13,
@@ -677,27 +830,29 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: "row",
-    padding: 16,
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    backgroundColor: "#eef4fb",
     gap: 12,
   },
   messageInput: {
     flex: 1,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 20,
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#dbe4f0",
     paddingHorizontal: 16,
     paddingVertical: 10,
-    fontSize: 16,
-    color: "#111",
+    fontSize: 15,
+    color: "#0f172a",
     maxHeight: 100,
   },
   sendButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#3b82f6",
+    backgroundColor: "#0f2d5c",
     justifyContent: "center",
     alignItems: "center",
   },
